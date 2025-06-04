@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { LeaderboardEntry } from "@shared/schema";
-import { formatTime, formatDate, getRankDisplay, getInitials, getAvatarGradient } from "@/lib/utils";
+import { formatTime, formatDate, getRankDisplay, getInitials, getAvatarGradient, calculatePace, getPerformanceLevel } from "@/lib/utils";
 import { RunnerProfileModal } from "./runner-profile-modal";
 import { RaceDetailModal } from "./race-detail-modal";
 
@@ -88,6 +88,9 @@ export function LeaderboardTable({ filters }: LeaderboardTableProps) {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Time
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Pace
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Race
