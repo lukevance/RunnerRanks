@@ -1,0 +1,192 @@
+import { useParams } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft, ExternalLink, Info } from "lucide-react";
+import { Link } from "wouter";
+import type { Race } from "@shared/schema";
+import { Header } from "@/components/header";
+import { formatDate } from "@/lib/utils";
+
+export default function RaceDetails() {
+  const { id } = useParams<{ id: string }>();
+  const raceId = parseInt(id || "0");
+
+  const { data: race, isLoading, error } = useQuery<Race>({
+    queryKey: ['/api/races', raceId],
+    queryFn: async () => {
+      const response = await fetch(`/api/races/${raceId}`);
+      if (!response.ok) throw new Error('Failed to fetch race');
+      return response.json();
+    }
+  });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <Header />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="animate-pulse space-y-6">
+            <div className="h-8 bg-slate-200 rounded w-1/4"></div>
+            <div className="h-64 bg-slate-200 rounded"></div>
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-16 bg-slate-100 rounded"></div>
+              ))}
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error || !race) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <Header />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center py-12">
+            <h2 className="text-2xl font-bold text-slate-900 mb-4">Race Not Found</h2>
+            <p className="text-slate-600 mb-6">The race you're looking for could not be found.</p>
+            <Link href="/">
+              <a className="bg-performance-blue text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+                Return to Leaderboard
+              </a>
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <Header />
+      
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Back button */}
+        <Link href="/">
+          <a className="inline-flex items-center text-slate-600 hover:text-slate-900 mb-6">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Leaderboard
+          </a>
+        </Link>
+
+        {/* Race Header with Hero Image */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+          <div className="relative">
+            <img 
+              src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&h=400" 
+              alt="Marathon start line" 
+              className="w-full h-64 object-cover"
+            />
+            <div className="absolute inset-0 bg-black bg-opacity-50"></div>
+            <div className="absolute inset-0 flex items-center p-8">
+              <div className="text-white">
+                <h1 className="text-4xl font-bold mb-2">{race.name}</h1>
+                <p className="text-white/90 text-xl">
+                  {formatDate(race.date)} • {race.city}, {race.state}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Race Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 text-center">
+            <div className="text-3xl font-bold text-slate-900 mb-2">
+              {race.totalFinishers.toLocaleString()}
+            </div>
+            <div className="text-sm text-slate-600">Total Finishers</div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 text-center">
+            <div className="text-3xl font-bold text-slate-900 mb-2">
+              {race.distanceMiles} mi
+            </div>
+            <div className="text-sm text-slate-600">Distance</div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 text-center">
+            <div className="text-3xl font-bold text-slate-900 mb-2">
+              {race.averageTime}
+            </div>
+            <div className="text-sm text-slate-600">Average Time</div>
+          </div>
+        </div>
+
+        {/* Race Details */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4">Race Details</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <div className="space-y-4">
+                <div>
+                  <span className="text-slate-600 font-medium">Start Time:</span>
+                  <span className="ml-3 text-slate-900">{race.startTime}</span>
+                </div>
+                {race.weather && (
+                  <div>
+                    <span className="text-slate-600 font-medium">Weather:</span>
+                    <span className="ml-3 text-slate-900">{race.weather}</span>
+                  </div>
+                )}
+                {race.courseType && (
+                  <div>
+                    <span className="text-slate-600 font-medium">Course Type:</span>
+                    <span className="ml-3 text-slate-900 capitalize">
+                      {race.courseType.replace('-', ' ')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div>
+              <div className="space-y-4">
+                <div>
+                  <span className="text-slate-600 font-medium">Distance:</span>
+                  <span className="ml-3 text-slate-900 capitalize">
+                    {race.distance.replace('-', ' ')} ({race.distanceMiles} miles)
+                  </span>
+                </div>
+                {race.elevation && (
+                  <div>
+                    <span className="text-slate-600 font-medium">Elevation Change:</span>
+                    <span className="ml-3 text-slate-900">{race.elevation}</span>
+                  </div>
+                )}
+                <div>
+                  <span className="text-slate-600 font-medium">Location:</span>
+                  <span className="ml-3 text-slate-900">{race.city}, {race.state}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          {race.resultsUrl && (
+            <a 
+              href={race.resultsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 bg-performance-blue text-white text-center py-4 px-6 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
+            >
+              <ExternalLink className="w-5 h-5 mr-2" />
+              View Full Results
+            </a>
+          )}
+          {race.organizerWebsite && (
+            <a 
+              href={race.organizerWebsite}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 bg-slate-100 text-slate-700 text-center py-4 px-6 rounded-lg hover:bg-slate-200 transition-colors flex items-center justify-center"
+            >
+              <Info className="w-5 h-5 mr-2" />
+              Race Website
+            </a>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
