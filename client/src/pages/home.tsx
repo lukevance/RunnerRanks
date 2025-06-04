@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Trophy, Clock, Calendar } from "lucide-react";
+import { Trophy, Clock, Calendar, Filter, ChevronDown, ChevronUp } from "lucide-react";
 import { Header } from "@/components/header";
 import { FilterControls } from "@/components/filter-controls";
 import { LeaderboardTable } from "@/components/leaderboard-table";
@@ -12,6 +12,7 @@ export default function Home() {
     ageGroup: "All Ages",
     search: ""
   });
+  const [showFilters, setShowFilters] = useState(false);
 
   // Get stats for the quick stats section
   const { data: stats } = useQuery({
@@ -36,12 +37,28 @@ export default function Home() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Page Header */}
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-slate-900 mb-2">Local Leaderboard</h2>
-          <p className="text-slate-600">Top marathon and half-marathon times in your area</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-3xl font-bold text-slate-900 mb-2">Local Leaderboard</h2>
+              <p className="text-slate-600">Top marathon and half-marathon times in your area</p>
+            </div>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center space-x-2 px-4 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              <Filter className="w-4 h-4" />
+              <span>Filters</span>
+              {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
 
-        {/* Filter Controls */}
-        <FilterControls filters={filters} onFiltersChange={setFilters} />
+        {/* Collapsible Filter Controls */}
+        {showFilters && (
+          <div className="mb-8">
+            <FilterControls filters={filters} onFiltersChange={setFilters} />
+          </div>
+        )}
 
         {/* Leaderboard Table */}
         <LeaderboardTable filters={filters} />

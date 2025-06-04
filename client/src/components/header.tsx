@@ -16,20 +16,20 @@ export function Header() {
           </div>
           <nav className="hidden md:flex items-center space-x-6">
             <Link href="/">
-              <a className={`transition-colors pb-4 ${
+              <span className={`transition-colors pb-4 cursor-pointer ${
                 location === "/" 
                   ? "text-performance-blue font-medium border-b-2 border-performance-blue" 
                   : "text-slate-600 hover:text-slate-900"
               }`}>
                 Leaderboard
-              </a>
+              </span>
             </Link>
-            <a href="#" className="text-slate-600 hover:text-slate-900 transition-colors">
+            <span className="text-slate-600 hover:text-slate-900 transition-colors cursor-pointer">
               My Profile
-            </a>
-            <a href="#" className="text-slate-600 hover:text-slate-900 transition-colors">
+            </span>
+            <span className="text-slate-600 hover:text-slate-900 transition-colors cursor-pointer">
               Add Result
-            </a>
+            </span>
           </nav>
         </div>
       </div>
