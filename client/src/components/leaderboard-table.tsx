@@ -174,8 +174,14 @@ export function LeaderboardTable({ filters }: LeaderboardTableProps) {
                       >
                         {entry.race.name}
                       </div>
-                      <div className="text-sm text-slate-500">
-                        {entry.race.distanceMiles} mi
+                      <div className="text-sm text-slate-500 flex items-center space-x-2">
+                        <span>{entry.race.distanceMiles} mi</span>
+                        {entry.race.weather && (
+                          <div className="flex items-center space-x-1">
+                            <span>{weatherIcon}</span>
+                            <span className={tempColor}>{entry.race.weather}</span>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
