@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { LeaderboardEntry } from "@shared/schema";
-import { formatTime, formatDate, getRankDisplay, getInitials, getAvatarGradient, calculatePace, getPerformanceLevel } from "@/lib/utils";
+import { formatTime, formatDate, getRankDisplay, getInitials, getAvatarGradient, calculatePace, getPerformanceLevel, isBostonQualifier, getWeatherIcon, getTemperatureColor } from "@/lib/utils";
 import { RunnerProfileModal } from "./runner-profile-modal";
 import { RaceDetailModal } from "./race-detail-modal";
 
@@ -42,7 +42,10 @@ export function LeaderboardTable({ filters }: LeaderboardTableProps) {
     }
   };
 
-  const getResultNote = (result: any) => {
+  const getResultNote = (result: any, race: any, runner: any) => {
+    const isBQ = isBostonQualifier(result.finishTime, race.distance, runner.gender, runner.age);
+    
+    if (isBQ) return { text: "Boston Qualifier", className: "text-blue-600 font-medium" };
     if (result.isPersonalBest) return { text: "Personal Best", className: "text-achievement-green" };
     if (result.isSeasonBest) return { text: "Season Best", className: "text-achievement-green" };
     if (result.notes) return { text: result.notes, className: "text-slate-500" };
@@ -107,9 +110,13 @@ export function LeaderboardTable({ filters }: LeaderboardTableProps) {
               {entries.map((entry, index) => {
                 const rank = index + 1;
                 const rankDisplay = getRankDisplay(rank);
-                const note = getResultNote(entry.result);
+                const note = getResultNote(entry.result, entry.race, entry.runner);
                 const initials = getInitials(entry.runner.name);
                 const gradient = getAvatarGradient(entry.runner.name);
+                const pace = calculatePace(entry.result.finishTime, parseFloat(entry.race.distanceMiles));
+                const performance = getPerformanceLevel(entry.result.finishTime, entry.race.distance, entry.runner.gender, entry.runner.age);
+                const weatherIcon = getWeatherIcon(entry.race.weather);
+                const tempColor = getTemperatureColor(entry.race.weather);
 
                 return (
                   <tr 
@@ -147,6 +154,14 @@ export function LeaderboardTable({ filters }: LeaderboardTableProps) {
                       </div>
                       <div className={`text-sm ${note.className}`}>
                         {note.text}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-lg font-bold text-slate-900">
+                        {pace}/mi
+                      </div>
+                      <div className={`text-sm ${performance.color}`}>
+                        {performance.level}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

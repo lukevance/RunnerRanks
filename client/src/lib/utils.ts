@@ -80,6 +80,93 @@ export function getPerformanceLevel(timeStr: string, distance: string, gender: s
   }
 }
 
+export function isBostonQualifier(timeStr: string, distance: string, gender: string, age: number): boolean {
+  if (distance !== 'marathon') return false;
+  
+  const totalSeconds = timeToSeconds(timeStr);
+  
+  // Boston Marathon qualifying times (in seconds) by age group and gender
+  const bqTimes: { [key: string]: { [key: string]: number } } = {
+    'M': {
+      '18-34': 3 * 3600 + 0 * 60,   // 3:00:00
+      '35-39': 3 * 3600 + 5 * 60,   // 3:05:00
+      '40-44': 3 * 3600 + 10 * 60,  // 3:10:00
+      '45-49': 3 * 3600 + 20 * 60,  // 3:20:00
+      '50-54': 3 * 3600 + 25 * 60,  // 3:25:00
+      '55-59': 3 * 3600 + 35 * 60,  // 3:35:00
+      '60-64': 3 * 3600 + 50 * 60,  // 3:50:00
+      '65-69': 4 * 3600 + 5 * 60,   // 4:05:00
+      '70-74': 4 * 3600 + 20 * 60,  // 4:20:00
+      '75-79': 4 * 3600 + 35 * 60,  // 4:35:00
+      '80+': 4 * 3600 + 50 * 60     // 4:50:00
+    },
+    'F': {
+      '18-34': 3 * 3600 + 30 * 60,  // 3:30:00
+      '35-39': 3 * 3600 + 35 * 60,  // 3:35:00
+      '40-44': 3 * 3600 + 40 * 60,  // 3:40:00
+      '45-49': 3 * 3600 + 50 * 60,  // 3:50:00
+      '50-54': 3 * 3600 + 55 * 60,  // 3:55:00
+      '55-59': 4 * 3600 + 5 * 60,   // 4:05:00
+      '60-64': 4 * 3600 + 20 * 60,  // 4:20:00
+      '65-69': 4 * 3600 + 35 * 60,  // 4:35:00
+      '70-74': 4 * 3600 + 50 * 60,  // 4:50:00
+      '75-79': 5 * 3600 + 5 * 60,   // 5:05:00
+      '80+': 5 * 3600 + 20 * 60     // 5:20:00
+    }
+  };
+  
+  const getAgeGroup = (age: number): string => {
+    if (age >= 18 && age <= 34) return '18-34';
+    if (age >= 35 && age <= 39) return '35-39';
+    if (age >= 40 && age <= 44) return '40-44';
+    if (age >= 45 && age <= 49) return '45-49';
+    if (age >= 50 && age <= 54) return '50-54';
+    if (age >= 55 && age <= 59) return '55-59';
+    if (age >= 60 && age <= 64) return '60-64';
+    if (age >= 65 && age <= 69) return '65-69';
+    if (age >= 70 && age <= 74) return '70-74';
+    if (age >= 75 && age <= 79) return '75-79';
+    return '80+';
+  };
+  
+  const ageGroup = getAgeGroup(age);
+  const qualifyingTime = bqTimes[gender]?.[ageGroup];
+  
+  return qualifyingTime ? totalSeconds <= qualifyingTime : false;
+}
+
+export function getWeatherIcon(weather: string | null): string {
+  if (!weather) return "🌤️";
+  
+  const weatherLower = weather.toLowerCase();
+  
+  if (weatherLower.includes("clear") || weatherLower.includes("sunny")) return "☀️";
+  if (weatherLower.includes("cloud") || weatherLower.includes("overcast")) return "☁️";
+  if (weatherLower.includes("rain") || weatherLower.includes("drizzle")) return "🌧️";
+  if (weatherLower.includes("snow")) return "❄️";
+  if (weatherLower.includes("fog")) return "🌫️";
+  if (weatherLower.includes("wind")) return "💨";
+  if (weatherLower.includes("hot")) return "🔥";
+  if (weatherLower.includes("cold")) return "🥶";
+  
+  return "🌤️";
+}
+
+export function getTemperatureColor(weather: string | null): string {
+  if (!weather) return "text-slate-500";
+  
+  const tempMatch = weather.match(/(\d+)°?F?/);
+  if (!tempMatch) return "text-slate-500";
+  
+  const temp = parseInt(tempMatch[1]);
+  
+  if (temp >= 80) return "text-red-500";
+  if (temp >= 70) return "text-orange-500";
+  if (temp >= 50) return "text-green-500";
+  if (temp >= 40) return "text-blue-500";
+  return "text-purple-500";
+}
+
 export function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
   return date.toLocaleDateString('en-US', {
