@@ -27,9 +27,11 @@ export function Header() {
             <span className="text-slate-600 hover:text-slate-900 transition-colors cursor-pointer">
               My Profile
             </span>
-            <span className="text-slate-600 hover:text-slate-900 transition-colors cursor-pointer">
-              Add Result
-            </span>
+            <Link href="/admin">
+              <span className="text-slate-600 hover:text-slate-900 transition-colors cursor-pointer">
+                Admin
+              </span>
+            </Link>
           </nav>
         </div>
       </div>
