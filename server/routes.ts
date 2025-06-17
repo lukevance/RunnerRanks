@@ -253,13 +253,164 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Search for potential duplicate runners
-  app.get("/api/runners/duplicates", async (req, res) => {
+  // CSV Import endpoint
+  app.post("/api/import/csv", async (req, res) => {
     try {
-      const duplicates = await storage.findPotentialDuplicates();
-      res.json(duplicates);
+      const { csvData, sourceProvider = 'csv' } = req.body;
+      
+      if (!csvData) {
+        return res.status(400).json({ error: "CSV data is required" });
+      }
+
+      // Parse CSV data
+      const lines = csvData.trim().split('\n');
+      const headers = lines[0].split(',').map((h: string) => h.trim().toLowerCase());
+      
+      // Create a synthetic race for CSV imports
+      const raceData = {
+        name: "CSV Import Race",
+        date: new Date().toISOString().split('T')[0],
+        distance: "marathon",
+        distanceMiles: "26.20",
+        city: "Unknown",
+        state: "Unknown",
+        startTime: "7:00 AM",
+        weather: null,
+        courseType: null,
+        elevation: null,
+        totalFinishers: lines.length - 1,
+        averageTime: "0:00:00",
+        organizerWebsite: null,
+        resultsUrl: null
+      };
+
+      const race = await storage.createRace(raceData);
+
+      const importResults = {
+        imported: 0,
+        matched: 0,
+        newRunners: 0,
+        needsReview: 0,
+        errors: []
+      };
+
+      // Process each data row
+      for (let i = 1; i < lines.length; i++) {
+        try {
+          const values = lines[i].split(',').map((v: string) => v.trim());
+          const rowData: any = {};
+          
+          headers.forEach((header, index) => {
+            if (values[index]) {
+              rowData[header] = values[index];
+            }
+          });
+
+          const rawRunnerData: RawRunnerData = {
+            name: rowData.name || rowData.runner_name || '',
+            age: rowData.age ? parseInt(rowData.age) : undefined,
+            gender: rowData.gender || rowData.sex,
+            city: rowData.city,
+            state: rowData.state,
+            location: rowData.location,
+            email: rowData.email,
+            finishTime: rowData.finish_time || rowData.time || rowData.finishtime || ''
+          };
+
+          if (!rawRunnerData.name || !rawRunnerData.finishTime) {
+            importResults.errors.push(`Row ${i}: Missing required name or finish_time`);
+            continue;
+          }
+
+          const matchResult = await runnerMatcher.matchRunner(
+            rawRunnerData,
+            sourceProvider,
+            race.id.toString()
+          );
+
+          const resultData = {
+            runnerId: matchResult.runner.id,
+            raceId: race.id,
+            finishTime: rawRunnerData.finishTime,
+            overallPlace: rowData.overall_place ? parseInt(rowData.overall_place) : i,
+            genderPlace: rowData.gender_place ? parseInt(rowData.gender_place) : null,
+            ageGroupPlace: rowData.age_group_place ? parseInt(rowData.age_group_place) : null,
+            isPersonalBest: false,
+            isSeasonBest: false,
+            notes: rowData.notes,
+            sourceProvider,
+            sourceResultId: `csv_${i}`,
+            rawRunnerName: rawRunnerData.name,
+            rawLocation: rawRunnerData.location,
+            rawAge: rawRunnerData.age,
+            matchingScore: matchResult.matchScore,
+            needsReview: matchResult.needsReview,
+            importedAt: new Date().toISOString()
+          };
+
+          await storage.createResult(resultData);
+
+          importResults.imported++;
+          if (matchResult.matchScore === 100) {
+            importResults.newRunners++;
+          } else {
+            importResults.matched++;
+          }
+          if (matchResult.needsReview) {
+            importResults.needsReview++;
+          }
+
+        } catch (error) {
+          importResults.errors.push(`Row ${i}: ${error}`);
+        }
+      }
+
+      res.json({
+        success: true,
+        race: race,
+        importResults
+      });
+
     } catch (error) {
-      res.status(500).json({ error: "Failed to find duplicates" });
+      console.error("CSV import error:", error);
+      res.status(500).json({ error: "Failed to import CSV data" });
+    }
+  });
+
+  // URL Import endpoints
+  app.post("/api/import/runsignup", async (req, res) => {
+    try {
+      const { url } = req.body;
+      
+      if (!url) {
+        return res.status(400).json({ error: "RunSignup URL is required" });
+      }
+
+      // For now, return a helpful error since we need API keys
+      res.status(400).json({ 
+        error: "RunSignup integration requires API credentials. Please use CSV import or contact admin to set up RunSignup API access." 
+      });
+
+    } catch (error) {
+      res.status(500).json({ error: "Failed to import from RunSignup" });
+    }
+  });
+
+  app.post("/api/import/raceroster", async (req, res) => {
+    try {
+      const { url } = req.body;
+      
+      if (!url) {
+        return res.status(400).json({ error: "RaceRoster URL is required" });
+      }
+
+      // For now, return a helpful error since we need API keys
+      res.status(400).json({ 
+        error: "RaceRoster integration requires API credentials. Please use CSV import or contact admin to set up RaceRoster API access." 
+      });
+
+    } catch (error) {
+      res.status(500).json({ error: "Failed to import from RaceRoster" });
     }
   });
 

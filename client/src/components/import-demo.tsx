@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Upload, AlertTriangle, CheckCircle, XCircle, User, Clock } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { Upload, AlertTriangle, CheckCircle, XCircle, User, Clock, ExternalLink, FileText } from "lucide-react";
 
 interface ImportResult {
   imported: number;
@@ -105,26 +104,62 @@ const EXAMPLE_RESULTS_DATA = [
 ];
 
 export function ImportDemo() {
+  const [importUrl, setImportUrl] = useState("");
+  const [importType, setImportType] = useState<"url" | "csv">("url");
+  const [csvData, setCsvData] = useState("");
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const queryClient = useQueryClient();
 
   const importMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch('/api/import/race-results', {
+      let endpoint = '/api/import/race-results';
+      let body: any = {};
+
+      if (importType === "url") {
+        if (!importUrl.trim()) {
+          throw new Error('Please enter a race results URL');
+        }
+        
+        // Determine provider from URL
+        const url = importUrl.toLowerCase();
+        let provider = 'unknown';
+        
+        if (url.includes('runsignup.com')) {
+          provider = 'runsignup';
+          endpoint = '/api/import/runsignup';
+        } else if (url.includes('raceroster.com')) {
+          provider = 'raceroster';
+          endpoint = '/api/import/raceroster';
+        }
+        
+        body = {
+          url: importUrl,
+          sourceProvider: provider
+        };
+      } else {
+        if (!csvData.trim()) {
+          throw new Error('Please paste CSV data or enter a URL');
+        }
+        
+        body = {
+          csvData: csvData,
+          sourceProvider: 'csv'
+        };
+        endpoint = '/api/import/csv';
+      }
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          raceData: EXAMPLE_RACE_DATA,
-          resultsData: EXAMPLE_RESULTS_DATA,
-          sourceProvider: 'demo'
-        }),
+        body: JSON.stringify(body),
       });
       
       if (!response.ok) {
-        throw new Error('Import failed');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Import failed');
       }
       
       return response.json();
@@ -201,27 +236,121 @@ export function ImportDemo() {
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <div className="flex items-center space-x-3 mb-4">
           <Upload className="w-6 h-6 text-performance-blue" />
-          <h2 className="text-xl font-bold text-slate-900">Runner Matching Demo</h2>
+          <h2 className="text-xl font-bold text-slate-900">Import Race Results</h2>
         </div>
-        <p className="text-slate-600 mb-4">
-          This demonstrates how the system handles real-world challenges when importing race results 
-          from providers like RunSignup and RaceRoster.
+        <p className="text-slate-600 mb-6">
+          Import race results from RunSignup, RaceRoster, or CSV data. The system will automatically 
+          match runners and handle duplicates.
         </p>
-        
-        <button
-          onClick={handleImport}
-          disabled={importing || importMutation.isPending}
-          className="bg-performance-blue text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-        >
-          {importing || importMutation.isPending ? (
-            <div className="flex items-center space-x-2">
-              <Clock className="w-4 h-4 animate-spin" />
-              <span>Importing & Matching...</span>
+
+        {/* Import Type Selection */}
+        <div className="flex space-x-4 mb-6">
+          <button
+            onClick={() => setImportType("url")}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
+              importType === "url" 
+                ? "bg-performance-blue text-white border-performance-blue" 
+                : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+            }`}
+          >
+            <ExternalLink className="w-4 h-4" />
+            <span>URL Import</span>
+          </button>
+          <button
+            onClick={() => setImportType("csv")}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
+              importType === "csv" 
+                ? "bg-performance-blue text-white border-performance-blue" 
+                : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            <span>CSV Data</span>
+          </button>
+        </div>
+
+        {/* URL Import */}
+        {importType === "url" && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Race Results URL
+              </label>
+              <input
+                type="url"
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+                placeholder="https://runsignup.com/Race/Results/12345 or https://raceroster.com/events/12345/results"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-performance-blue focus:border-performance-blue"
+              />
             </div>
-          ) : (
-            "Import Sample Race Results"
+            <div className="text-sm text-slate-600">
+              <p className="mb-1">Supported providers:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>RunSignup.com race results pages</li>
+                <li>RaceRoster.com event results</li>
+                <li>Direct CSV export URLs</li>
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {/* CSV Import */}
+        {importType === "csv" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-slate-700">
+                CSV Data
+              </label>
+              <button
+                onClick={() => setCsvData(`name,age,gender,city,state,finish_time,overall_place,gender_place
+John Smith,29,M,San Francisco,CA,2:18:45,1,1
+Sarah Johnson,31,F,Oakland,CA,2:24:12,2,1
+Mike Rodriguez,42,M,Berkeley,CA,2:31:55,3,2
+Lisa Chen,28,F,San Jose,CA,2:35:18,4,2
+David Kim,35,M,Palo Alto,CA,2:42:33,5,3
+Jennifer Wang,26,F,San Francisco,CA,2:48:15,6,3`)}
+                className="text-sm text-performance-blue hover:text-blue-700"
+              >
+                Load Sample Data
+              </button>
+            </div>
+            <textarea
+              value={csvData}
+              onChange={(e) => setCsvData(e.target.value)}
+              placeholder="name,age,gender,city,state,finish_time,overall_place,gender_place&#10;John Doe,32,M,San Francisco,CA,2:15:30,1,1&#10;Jane Smith,28,F,Oakland,CA,2:22:15,2,1"
+              rows={8}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-performance-blue focus:border-performance-blue font-mono text-sm"
+            />
+            <div className="text-sm text-slate-600">
+              <p className="mb-1">Required columns: name, finish_time</p>
+              <p className="mb-1">Optional columns: age, gender, city, state, overall_place, gender_place, age_group_place</p>
+            </div>
+          </div>
+        )}
+        
+        <div className="flex items-center space-x-4 mt-6">
+          <button
+            onClick={handleImport}
+            disabled={importing || importMutation.isPending || (!importUrl.trim() && !csvData.trim())}
+            className="bg-performance-blue text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            {importing || importMutation.isPending ? (
+              <div className="flex items-center space-x-2">
+                <Clock className="w-4 h-4 animate-spin" />
+                <span>Importing & Matching...</span>
+              </div>
+            ) : (
+              "Import Results"
+            )}
+          </button>
+          
+          {importMutation.error && (
+            <div className="text-red-600 text-sm">
+              {importMutation.error.message}
+            </div>
           )}
-        </button>
+        </div>
       </div>
 
       {/* Expected Matching Scenarios */}
