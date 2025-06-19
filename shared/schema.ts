@@ -71,6 +71,33 @@ export const runnerMatches = pgTable("runner_matches", {
   createdAt: text("created_at").notNull(),
 });
 
+// Race Series for tracking performance across multiple events
+export const raceSeries = pgTable("race_series", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  year: integer("year").notNull(),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  scoringSystem: text("scoring_system").notNull().default("points"), // "points", "time", "placement"
+  minimumRaces: integer("minimum_races").notNull().default(2),
+  maxRacesForScore: integer("max_races_for_score"), // null = count all races
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: text("created_at").notNull(),
+  createdBy: text("created_by"), // Admin who created the series
+});
+
+// Junction table linking races to series
+export const raceSeriesRaces = pgTable("race_series_races", {
+  id: serial("id").primaryKey(),
+  seriesId: integer("series_id").notNull().references(() => raceSeries.id),
+  raceId: integer("race_id").notNull().references(() => races.id),
+  seriesRaceNumber: integer("series_race_number"), // 1st, 2nd, 3rd race in series
+  pointsMultiplier: decimal("points_multiplier", { precision: 3, scale: 2 }).default("1.00"), // For weighted races
+  isCountedInSeries: boolean("is_counted_in_series").notNull().default(true),
+  addedAt: text("added_at").notNull(),
+});
+
 export const insertRunnerSchema = createInsertSchema(runners).omit({
   id: true,
 });
@@ -87,15 +114,27 @@ export const insertRunnerMatchSchema = createInsertSchema(runnerMatches).omit({
   id: true,
 });
 
+export const insertRaceSeriesSchema = createInsertSchema(raceSeries).omit({
+  id: true,
+});
+
+export const insertRaceSeriesRaceSchema = createInsertSchema(raceSeriesRaces).omit({
+  id: true,
+});
+
 export type InsertRunner = z.infer<typeof insertRunnerSchema>;
 export type InsertRace = z.infer<typeof insertRaceSchema>;
 export type InsertResult = z.infer<typeof insertResultSchema>;
 export type InsertRunnerMatch = z.infer<typeof insertRunnerMatchSchema>;
+export type InsertRaceSeries = z.infer<typeof insertRaceSeriesSchema>;
+export type InsertRaceSeriesRace = z.infer<typeof insertRaceSeriesRaceSchema>;
 
 export type Runner = typeof runners.$inferSelect;
 export type Race = typeof races.$inferSelect;
 export type Result = typeof results.$inferSelect;
 export type RunnerMatch = typeof runnerMatches.$inferSelect;
+export type RaceSeries = typeof raceSeries.$inferSelect;
+export type RaceSeriesRace = typeof raceSeriesRaces.$inferSelect;
 
 // Extended types for API responses
 export type LeaderboardEntry = {
@@ -111,4 +150,27 @@ export type RunnerWithStats = Runner & {
   racesThisYear: number;
   ageGroupWins: number;
   results: (Result & { race: Race })[];
+};
+
+// Extended types for race series
+export type RaceSeriesWithRaces = RaceSeries & {
+  races: (RaceSeriesRace & { race: Race })[];
+  totalRaces: number;
+  participantCount: number;
+};
+
+export type SeriesStanding = {
+  runner: Runner;
+  totalPoints: number;
+  averagePoints: number;
+  racesCompleted: number;
+  bestRacePoints: number;
+  results: (Result & { race: Race; points: number })[];
+  rank: number;
+};
+
+export type SeriesLeaderboard = {
+  series: RaceSeries;
+  standings: SeriesStanding[];
+  totalParticipants: number;
 };
