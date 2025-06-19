@@ -240,6 +240,55 @@ export class MemStorage implements IStorage {
     for (const resultData of sampleResults) {
       await this.createResult(resultData);
     }
+
+    // Sample race series
+    const sampleSeries = [
+      {
+        name: "Bay Area Marathon Series 2024",
+        description: "Premier marathon series across the San Francisco Bay Area",
+        year: 2024,
+        startDate: "2024-01-01",
+        endDate: "2024-12-31",
+        scoringSystem: "points",
+        minimumRaces: 2,
+        maxRacesForScore: 4,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        createdBy: "admin"
+      },
+      {
+        name: "Northern California Trail Series",
+        description: "Trail running series featuring scenic routes",
+        year: 2024,
+        startDate: "2024-03-01",
+        endDate: "2024-11-30",
+        scoringSystem: "points",
+        minimumRaces: 3,
+        maxRacesForScore: null,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        createdBy: "admin"
+      }
+    ];
+
+    // Create race series
+    for (const seriesData of sampleSeries) {
+      const series = await this.createRaceSeries(seriesData);
+      
+      // Add races to first series
+      if (series.id === 1) {
+        await this.addRaceToSeries(series.id, 1, { seriesRaceNumber: 1 });
+        await this.addRaceToSeries(series.id, 2, { seriesRaceNumber: 2 });
+        await this.addRaceToSeries(series.id, 3, { seriesRaceNumber: 3 });
+      }
+      
+      // Add races to second series
+      if (series.id === 2) {
+        await this.addRaceToSeries(series.id, 3, { seriesRaceNumber: 1 });
+        await this.addRaceToSeries(series.id, 4, { seriesRaceNumber: 2 });
+        await this.addRaceToSeries(series.id, 5, { seriesRaceNumber: 3 });
+      }
+    }
   }
 
   // Runner methods
