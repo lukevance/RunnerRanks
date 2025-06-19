@@ -1,8 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertRunnerSchema, insertRaceSchema, insertResultSchema } from "@shared/schema";
+import { insertRunnerSchema, insertRaceSchema, insertResultSchema, insertRaceSeriesSchema } from "@shared/schema";
 import { runnerMatcher, type RawRunnerData } from "./runner-matching";
+import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Leaderboard endpoint
@@ -411,6 +412,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error) {
       res.status(500).json({ error: "Failed to import from RaceRoster" });
+    }
+  });
+
+  // Race Series routes
+  app.get("/api/race-series", async (req, res) => {
+    try {
+      const series = await storage.getAllRaceSeries();
+      res.json(series);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch race series" });
+    }
+  });
+
+  app.get("/api/race-series/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const series = await storage.getRaceSeries(id);
+      if (!series) {
+        return res.status(404).json({ error: "Race series not found" });
+      }
+      res.json(series);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch race series" });
+    }
+  });
+
+  app.post("/api/race-series", async (req, res) => {
+    try {
+      const seriesData = insertRaceSeriesSchema.parse(req.body);
+      const series = await storage.createRaceSeries({
+        ...seriesData,
+        createdAt: new Date().toISOString(),
+        createdBy: "admin" // TODO: Add proper user auth
+      });
+      res.json(series);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid series data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create race series" });
+    }
+  });
+
+  app.patch("/api/race-series/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updates = req.body;
+      const series = await storage.updateRaceSeries(id, updates);
+      if (!series) {
+        return res.status(404).json({ error: "Race series not found" });
+      }
+      res.json(series);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update race series" });
+    }
+  });
+
+  app.delete("/api/race-series/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteRaceSeries(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Race series not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete race series" });
+    }
+  });
+
+  app.post("/api/race-series/:seriesId/races/:raceId", async (req, res) => {
+    try {
+      const seriesId = parseInt(req.params.seriesId);
+      const raceId = parseInt(req.params.raceId);
+      const { seriesRaceNumber, pointsMultiplier } = req.body;
+      
+      const seriesRace = await storage.addRaceToSeries(seriesId, raceId, {
+        seriesRaceNumber,
+        pointsMultiplier
+      });
+      res.json(seriesRace);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to add race to series" });
+    }
+  });
+
+  app.delete("/api/race-series/:seriesId/races/:raceId", async (req, res) => {
+    try {
+      const seriesId = parseInt(req.params.seriesId);
+      const raceId = parseInt(req.params.raceId);
+      
+      const removed = await storage.removeRaceFromSeries(seriesId, raceId);
+      if (!removed) {
+        return res.status(404).json({ error: "Race not found in series" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove race from series" });
+    }
+  });
+
+  app.get("/api/race-series/:id/leaderboard", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const leaderboard = await storage.getSeriesLeaderboard(id);
+      res.json(leaderboard);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch series leaderboard" });
+    }
+  });
+
+  app.get("/api/runners/:id/series-history", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const history = await storage.getRunnerSeriesHistory(id);
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch runner series history" });
     }
   });
 
