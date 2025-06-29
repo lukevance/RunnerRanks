@@ -63,7 +63,7 @@ export function SeriesLeaderboardModal({ series, onClose }: SeriesLeaderboardMod
           <div className="space-y-6">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div className="bg-slate-50 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-slate-900">{leaderboard.standings.length}</div>
+                <div className="text-2xl font-bold text-slate-900">{leaderboard.standings?.length || 0}</div>
                 <div className="text-sm text-slate-600">Qualified Runners</div>
               </div>
               <div className="bg-slate-50 p-4 rounded-lg">
@@ -76,12 +76,13 @@ export function SeriesLeaderboardModal({ series, onClose }: SeriesLeaderboardMod
               </div>
             </div>
 
-            <div className="space-y-3">
-              {leaderboard.standings.map((standing) => (
-                <div
-                  key={standing.runner.id}
-                  className={`flex items-center space-x-4 p-4 border rounded-lg transition-all ${getRankColor(standing.rank)}`}
-                >
+            {leaderboard.standings && leaderboard.standings.length > 0 ? (
+              <div className="space-y-3">
+                {leaderboard.standings.map((standing) => (
+                  <div
+                    key={standing.runner.id}
+                    className={`flex items-center space-x-4 p-4 border rounded-lg transition-all ${getRankColor(standing.rank)}`}
+                  >
                   <div className="flex items-center justify-center w-8">
                     {getRankIcon(standing.rank)}
                   </div>
@@ -121,15 +122,22 @@ export function SeriesLeaderboardModal({ series, onClose }: SeriesLeaderboardMod
                   </div>
                 </div>
               ))}
-            </div>
-
-            {leaderboard.standings.length === 0 && (
+              </div>
+            ) : (
               <div className="text-center py-12">
                 <User className="w-12 h-12 text-slate-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-slate-900 mb-2">No qualified runners yet</h3>
-                <p className="text-slate-600">
-                  Runners need to complete at least {series.minimumRaces} race{series.minimumRaces !== 1 ? 's' : ''} to appear on the leaderboard
+                <p className="text-slate-600 mb-4">
+                  {series.totalRaces === 0 
+                    ? "This series has no races yet. Add races to start tracking results."
+                    : `Runners need to complete at least ${series.minimumRaces} race${series.minimumRaces !== 1 ? 's' : ''} to appear on the leaderboard.`
+                  }
                 </p>
+                {series.totalRaces === 0 && (
+                  <p className="text-sm text-slate-500">
+                    Contact your administrator to add races to this series.
+                  </p>
+                )}
               </div>
             )}
 
