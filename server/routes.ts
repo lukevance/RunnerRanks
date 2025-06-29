@@ -445,7 +445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...seriesData,
         createdAt: new Date().toISOString(),
         createdBy: "admin" // TODO: Add proper user auth
-      });
+      } as any);
       res.json(series);
     } catch (error) {
       if (error instanceof z.ZodError) {

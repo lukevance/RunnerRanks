@@ -116,6 +116,8 @@ export const insertRunnerMatchSchema = createInsertSchema(runnerMatches).omit({
 
 export const insertRaceSeriesSchema = createInsertSchema(raceSeries).omit({
   id: true,
+  createdAt: true,
+  createdBy: true,
 });
 
 export const insertRaceSeriesRaceSchema = createInsertSchema(raceSeriesRaces).omit({
