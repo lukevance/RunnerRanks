@@ -39,7 +39,7 @@ Built with:
 
 ## Recent Changes
 
-### June 29, 2025 - Race Series Feature Complete
+### June 29, 2025 - Race Series Feature Complete & RunSignup URL Import
 ✓ Built complete race series management system as admin-only feature
 ✓ Created configurable scoring system with points-based calculations
 ✓ Implemented race size bonuses in point calculations (larger races = more points)
@@ -48,6 +48,10 @@ Built with:
 ✓ Fixed API request format issues in frontend components
 ✓ Added sample race series data for testing
 ✓ Integrated with existing import and runner matching systems
+✓ Added race management interface with "Manage Races" buttons
+✓ Built comprehensive race selection and removal functionality
+✓ Implemented RunSignup URL parsing and race name detection
+✓ Added intelligent error handling for JavaScript-loaded results pages
 
 ### Key Race Series Features
 - **Series Creation**: Custom rules (minimum races, scoring system, date ranges)

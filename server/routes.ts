@@ -431,13 +431,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Create race entry
+      // Create race entry with proper schema fields
       const race = await storage.createRace({
         name: extractedRaceName,
-        date: new Date().toISOString().split('T')[0], // We'll need to extract this from the page
-        location: "Location TBD", // We'll need to extract this from the page
-        distance: "Various", // RunSignup races can have multiple distances
-        finishers: resultsData.length
+        date: new Date().toISOString().split('T')[0],
+        distance: "marathon", // Default assumption
+        distanceMiles: "26.2",
+        city: "TBD",
+        state: "TBD", 
+        startTime: "08:00:00",
+        totalFinishers: resultsData.length,
+        averageTime: "04:00:00"
       });
 
       // Process results and match runners
@@ -461,17 +465,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             finishTime: result.finish_time || result.chip_time || result.gun_time || "0:00:00"
           };
 
-          const { runner, matchScore, needsReview } = await runnerMatcher.matchRunner(rawRunnerData, race.id);
+          const { runner, matchScore, needsReview } = await runnerMatcher.matchRunner(rawRunnerData, race.id, storage);
           
-          // Create result entry
+          // Create result entry with proper schema fields
           await storage.createResult({
             runnerId: runner.id,
             raceId: race.id,
             finishTime: rawRunnerData.finishTime,
             overallPlace: result.overall_place || 0,
-            genderPlace: result.gender_place || 0,
-            ageGroupPlace: result.age_group_place || 0,
-            ageGroup: result.age_group || ""
+            genderPlace: result.gender_place || null,
+            ageGroupPlace: result.age_group_place || null,
+            sourceProvider: "runsignup",
+            rawRunnerName: rawRunnerData.name,
+            matchingScore: matchScore,
+            needsReview: needsReview
           });
 
           importResults.imported++;
