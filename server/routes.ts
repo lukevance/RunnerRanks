@@ -381,18 +381,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // URL Import endpoints
   app.post("/api/import/runsignup", async (req, res) => {
     try {
-      const { url } = req.body;
+      const { url, raceName } = req.body;
       
       if (!url) {
         return res.status(400).json({ error: "RunSignup URL is required" });
       }
 
-      // For now, return a helpful error since we need API keys
+      // Extract race ID and result set ID from URL
+      const raceMatch = url.match(/\/Race\/Results\/(\d+)/);
+      const resultSetMatch = url.match(/resultSetId=(\d+)/);
+      
+      if (!raceMatch) {
+        return res.status(400).json({ error: "Invalid RunSignup URL format" });
+      }
+
+      const raceId = raceMatch[1];
+      const resultSetId = resultSetMatch ? resultSetMatch[1] : null;
+
+      // For now, return a more helpful message explaining the current limitation
       res.status(400).json({ 
-        error: "RunSignup integration requires API credentials. Please use CSV import or contact admin to set up RunSignup API access." 
+        error: "RunSignup URL import is being developed. The race data is publicly accessible, but we're working on the scraping implementation. Please use CSV import for now by downloading results from RunSignup.",
+        raceId,
+        resultSetId,
+        parsedUrl: url
       });
 
     } catch (error) {
+      console.error("RunSignup import error:", error);
       res.status(500).json({ error: "Failed to import from RunSignup" });
     }
   });
