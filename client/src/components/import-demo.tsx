@@ -276,6 +276,17 @@ export function ImportDemo() {
             <span>URL Import</span>
           </button>
           <button
+            onClick={() => setImportType("api")}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
+              importType === "api" 
+                ? "bg-performance-blue text-white border-performance-blue" 
+                : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+            }`}
+          >
+            <CheckCircle className="w-4 h-4" />
+            <span>API Import</span>
+          </button>
+          <button
             onClick={() => setImportType("csv")}
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-colors ${
               importType === "csv" 
@@ -309,6 +320,67 @@ export function ImportDemo() {
                 <li>RunSignup.com race results pages</li>
                 <li>RaceRoster.com event results</li>
                 <li>Direct CSV export URLs</li>
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {/* API Import */}
+        {importType === "api" && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Race ID <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={raceId}
+                  onChange={(e) => setRaceId(e.target.value)}
+                  placeholder="169856"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-performance-blue focus:border-performance-blue"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Event ID (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={eventId}
+                  onChange={(e) => setEventId(e.target.value)}
+                  placeholder="890301"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-performance-blue focus:border-performance-blue"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Race Name (Optional)
+              </label>
+              <input
+                type="text"
+                value={raceName}
+                onChange={(e) => setRaceName(e.target.value)}
+                placeholder="Colorado Marathon 2024"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-performance-blue focus:border-performance-blue"
+              />
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start space-x-2">
+                <CheckCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+                <div className="text-sm text-blue-800">
+                  <p className="font-medium mb-1">Official RunSignup API</p>
+                  <p>This uses authenticated API access for reliable data import. Leave Event ID blank to automatically select the event with the most participants.</p>
+                </div>
+              </div>
+            </div>
+            <div className="text-sm text-slate-600">
+              <p className="mb-1">How to find Race ID:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Visit the race results page on RunSignup.com</li>
+                <li>Look for the URL: runsignup.com/Race/Results/<strong>RACE_ID</strong></li>
+                <li>Example: For URL ending in /Results/169856, the Race ID is 169856</li>
               </ul>
             </div>
           </div>
