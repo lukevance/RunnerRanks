@@ -1,0 +1,81 @@
+# Running Leaderboard Platform
+
+## Overview
+A comprehensive running leaderboard platform that aggregates and displays local marathon and half-marathon results with advanced data management and user engagement features.
+
+Built with:
+- Frontend: React + TypeScript + Tailwind CSS + shadcn/ui components
+- Backend: Express.js + TypeScript
+- Storage: In-memory storage with comprehensive data models
+- API Integration: RunSignup and RaceRoster provider support
+
+## Project Architecture
+
+### Core Features
+1. **Main Leaderboard** - Displays fastest times with collapsible filtering (distance, gender, age group, search)
+2. **Runner Profiles** - Complete race history, personal records, statistics
+3. **Race Details** - Comprehensive race information and results
+4. **Data Import System** - CSV and URL import with sophisticated runner matching
+5. **Race Series Management** - Multi-event competitions with points-based scoring (Admin-only)
+
+### Technical Implementation
+
+#### Data Models
+- **Runners**: Core athlete profiles with matching confidence scores
+- **Races**: Event details including weather, elevation, course type
+- **Results**: Individual race performances with rankings and notes
+- **Race Series**: Multi-event competitions with configurable scoring
+- **Runner Matching**: Fuzzy matching system with confidence scoring (95%+ auto-match, 85-94% high confidence, 60-84% needs review)
+
+#### Storage System
+- In-memory storage (MemStorage) with complete CRUD operations
+- Sample data initialization with realistic race results
+- Advanced query capabilities for leaderboards and analytics
+
+#### API Structure
+- RESTful endpoints for all data operations
+- Comprehensive error handling with detailed logging
+- Integration endpoints for external race data providers
+
+## Recent Changes
+
+### June 29, 2025 - Race Series Feature Complete
+✓ Built complete race series management system as admin-only feature
+✓ Created configurable scoring system with points-based calculations
+✓ Implemented race size bonuses in point calculations (larger races = more points)
+✓ Added series creation form with race selection and validation
+✓ Developed comprehensive series leaderboard with standings and stats
+✓ Fixed API request format issues in frontend components
+✓ Added sample race series data for testing
+✓ Integrated with existing import and runner matching systems
+
+### Key Race Series Features
+- **Series Creation**: Custom rules (minimum races, scoring system, date ranges)
+- **Race Management**: Add/remove races from series with sequence numbers
+- **Leaderboard Calculation**: Automatic points calculation based on placement and race size
+- **Standings Display**: Total points, average performance, race completion stats
+- **Admin Interface**: Tabbed dashboard with series management tools
+
+## User Preferences
+- Race series feature should remain admin-only for now (may expand to other users later)
+- Focus on points-based scoring system as primary method
+- Minimum 2 races participation required for series standings
+- Prioritize data integrity - always use authentic race data when possible
+
+## Technical Notes
+- Runner matching uses Levenshtein distance for name similarity
+- Race points calculated based on placement and field size
+- Series standings require minimum race participation
+- All timestamps stored as ISO strings
+- Frontend uses TanStack Query for state management
+- Error handling includes detailed logging for debugging
+
+## Development Status
+✅ Core leaderboard functionality
+✅ Runner profile system
+✅ Race detail views
+✅ Data import with runner matching
+✅ Race series management (Admin)
+⏳ Individual race management tools
+⏳ Runner profile management tools
+⏳ Advanced analytics and reporting

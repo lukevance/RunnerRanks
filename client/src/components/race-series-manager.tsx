@@ -21,7 +21,7 @@ export function RaceSeriesManager() {
 
   const deleteMutation = useMutation({
     mutationFn: (seriesId: number) => 
-      apiRequest(`/api/race-series/${seriesId}`, { method: "DELETE" }),
+      apiRequest("DELETE", `/api/race-series/${seriesId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/race-series"] });
       toast({

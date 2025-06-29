@@ -53,19 +53,15 @@ export function RaceSeriesForm({ onClose }: RaceSeriesFormProps) {
   });
 
   const createSeriesMutation = useMutation({
-    mutationFn: (data: RaceSeriesFormData) => 
-      apiRequest("/api/race-series", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
+    mutationFn: async (data: RaceSeriesFormData) => {
+      const response = await apiRequest("POST", "/api/race-series", data);
+      return response.json();
+    },
     onSuccess: async (series) => {
       // Add selected races to the series
       if (selectedRaceIds.length > 0) {
         for (const raceId of selectedRaceIds) {
-          await apiRequest(`/api/race-series/${series.id}/races/${raceId}`, {
-            method: "POST",
-            body: JSON.stringify({}),
-          });
+          await apiRequest("POST", `/api/race-series/${series.id}/races/${raceId}`, {});
         }
       }
       
