@@ -398,12 +398,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const raceId = raceMatch[1];
       const resultSetId = resultSetMatch ? resultSetMatch[1] : null;
 
-      // For now, return a more helpful message explaining the current limitation
-      res.status(400).json({ 
-        error: "RunSignup URL import is being developed. The race data is publicly accessible, but we're working on the scraping implementation. Please use CSV import for now by downloading results from RunSignup.",
-        raceId,
-        resultSetId,
-        parsedUrl: url
+      // Fetch the race results page
+      const response = await fetch(url);
+      const html = await response.text();
+      
+      // Extract race information from HTML
+      const raceNameMatch = html.match(/<title>([^<]+) Results<\/title>/);
+      const extractedRaceName = raceNameMatch ? raceNameMatch[1] : (raceName || `Race ${raceId}`);
+      
+      // Look for JSON data in the page (RunSignup often embeds data in script tags)
+      const jsonMatch = html.match(/window\.RSU\.raceResults\s*=\s*({.*?});/);
+      let resultsData = [];
+      
+      if (jsonMatch) {
+        try {
+          const data = JSON.parse(jsonMatch[1]);
+          if (data.individual_results) {
+            resultsData = data.individual_results;
+          }
+        } catch (parseError) {
+          console.log("Failed to parse embedded JSON data:", parseError);
+        }
+      }
+      
+      if (resultsData.length === 0) {
+        return res.status(400).json({ 
+          error: "RunSignup loads results dynamically with JavaScript. To import this race, please:\n1. Visit the RunSignup results page\n2. Look for an 'Export' or 'Download CSV' option\n3. Use the CSV import feature instead\n\nThe race name was successfully detected as: " + extractedRaceName,
+          extractedRaceName,
+          raceId,
+          resultSetId,
+          suggestion: "Use CSV import for reliable data extraction"
+        });
+      }
+
+      // Create race entry
+      const race = await storage.createRace({
+        name: extractedRaceName,
+        date: new Date().toISOString().split('T')[0], // We'll need to extract this from the page
+        location: "Location TBD", // We'll need to extract this from the page
+        distance: "Various", // RunSignup races can have multiple distances
+        finishers: resultsData.length
+      });
+
+      // Process results and match runners
+      const importResults = {
+        totalResults: resultsData.length,
+        imported: 0,
+        matched: 0,
+        newRunners: 0,
+        needsReview: 0,
+        errors: [] as string[]
+      };
+
+      for (const result of resultsData) {
+        try {
+          const rawRunnerData: RawRunnerData = {
+            name: `${result.first_name || ''} ${result.last_name || ''}`.trim(),
+            age: result.age,
+            gender: result.gender,
+            city: result.city,
+            state: result.state,
+            finishTime: result.finish_time || result.chip_time || result.gun_time || "0:00:00"
+          };
+
+          const { runner, matchScore, needsReview } = await runnerMatcher.matchRunner(rawRunnerData, race.id);
+          
+          // Create result entry
+          await storage.createResult({
+            runnerId: runner.id,
+            raceId: race.id,
+            finishTime: rawRunnerData.finishTime,
+            overallPlace: result.overall_place || 0,
+            genderPlace: result.gender_place || 0,
+            ageGroupPlace: result.age_group_place || 0,
+            ageGroup: result.age_group || ""
+          });
+
+          importResults.imported++;
+          if (matchScore >= 95) {
+            importResults.matched++;
+          } else if (matchScore === 0) {
+            importResults.newRunners++;
+          } else if (needsReview) {
+            importResults.needsReview++;
+          }
+
+        } catch (error) {
+          console.error("Error processing result:", error);
+          importResults.errors.push(`Failed to process result for ${result.first_name} ${result.last_name}`);
+        }
+      }
+
+      res.json({
+        success: true,
+        race: race,
+        importResults
       });
 
     } catch (error) {
