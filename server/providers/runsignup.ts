@@ -49,10 +49,28 @@ export interface RunSignupResult {
 
 export class RunSignupProvider {
   private apiKey: string;
+  private apiSecret: string;
   private baseUrl = 'https://runsignup.com/Rest';
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, apiSecret: string) {
     this.apiKey = apiKey;
+    this.apiSecret = apiSecret;
+  }
+
+  /**
+   * Create authenticated request URL with API key and secret
+   */
+  private createAuthenticatedUrl(endpoint: string, params: Record<string, string | number> = {}): string {
+    const url = new URL(`${this.baseUrl}${endpoint}`);
+    url.searchParams.set('api_key', this.apiKey);
+    url.searchParams.set('api_secret', this.apiSecret);
+    url.searchParams.set('format', 'json');
+    
+    for (const [key, value] of Object.entries(params)) {
+      url.searchParams.set(key, String(value));
+    }
+    
+    return url.toString();
   }
 
   /**
@@ -65,14 +83,9 @@ export class RunSignupProvider {
     endDate?: string;
     distance?: string;
   }) {
-    const searchParams = new URLSearchParams({
-      format: 'json',
-      api_key: this.apiKey,
-      api_secret: process.env.RUNSIGNUP_SECRET || '',
-      ...params
-    });
-
-    const response = await fetch(`${this.baseUrl}/races?${searchParams}`);
+    const url = this.createAuthenticatedUrl('/races', params);
+    const response = await fetch(url);
+    
     if (!response.ok) {
       throw new Error(`RunSignup API error: ${response.statusText}`);
     }
@@ -85,13 +98,9 @@ export class RunSignupProvider {
    * Get race details by ID
    */
   async getRace(raceId: string) {
-    const params = new URLSearchParams({
-      format: 'json',
-      api_key: this.apiKey,
-      api_secret: process.env.RUNSIGNUP_SECRET || ''
-    });
-
-    const response = await fetch(`${this.baseUrl}/race/${raceId}?${params}`);
+    const url = this.createAuthenticatedUrl(`/race/${raceId}`);
+    const response = await fetch(url);
+    
     if (!response.ok) {
       throw new Error(`RunSignup API error: ${response.statusText}`);
     }
@@ -104,18 +113,14 @@ export class RunSignupProvider {
    * Get results for a specific race and event
    */
   async getResults(raceId: string, eventId?: string) {
-    const params = new URLSearchParams({
-      format: 'json',
-      api_key: this.apiKey,
-      api_secret: process.env.RUNSIGNUP_SECRET || '',
-      race_id: raceId
-    });
-
+    const params: Record<string, string> = {};
     if (eventId) {
-      params.append('event_id', eventId);
+      params.event_id = eventId;
     }
 
-    const response = await fetch(`${this.baseUrl}/race/${raceId}/results?${params}`);
+    const url = this.createAuthenticatedUrl(`/race/${raceId}/results/get-results`, params);
+    const response = await fetch(url);
+    
     if (!response.ok) {
       throw new Error(`RunSignup API error: ${response.statusText}`);
     }
