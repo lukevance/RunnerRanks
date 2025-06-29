@@ -5,14 +5,16 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trophy, Calendar, Users, Target } from "lucide-react";
+import { Plus, Trophy, Calendar, Users, Target, Settings, Eye, Trash2 } from "lucide-react";
 import { RaceSeriesForm } from "./race-series-form";
 import { SeriesLeaderboardModal } from "./series-leaderboard-modal";
+import { SeriesRaceManager } from "./series-race-manager";
 import type { RaceSeriesWithRaces } from "@shared/schema";
 
 export function RaceSeriesManager() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedSeries, setSelectedSeries] = useState<RaceSeriesWithRaces | null>(null);
+  const [managingSeries, setManagingSeries] = useState<RaceSeriesWithRaces | null>(null);
   const { toast } = useToast();
 
   const { data: raceSeries = [], isLoading } = useQuery({
@@ -157,7 +159,17 @@ export function RaceSeriesManager() {
                   onClick={() => setSelectedSeries(series)}
                   className="flex-1"
                 >
+                  <Eye className="w-4 h-4 mr-1" />
                   View Leaderboard
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setManagingSeries(series)}
+                  className="flex-1"
+                >
+                  <Settings className="w-4 h-4 mr-1" />
+                  Manage Races
                 </Button>
                 <Button
                   variant="outline"
@@ -166,7 +178,7 @@ export function RaceSeriesManager() {
                   disabled={deleteMutation.isPending}
                   className="text-red-600 hover:text-red-700 hover:bg-red-50"
                 >
-                  Delete
+                  <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
             </CardContent>
@@ -194,6 +206,13 @@ export function RaceSeriesManager() {
         <SeriesLeaderboardModal
           series={selectedSeries}
           onClose={() => setSelectedSeries(null)}
+        />
+      )}
+
+      {managingSeries && (
+        <SeriesRaceManager
+          series={managingSeries}
+          onClose={() => setManagingSeries(null)}
         />
       )}
     </div>
