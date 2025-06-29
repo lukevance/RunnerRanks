@@ -106,17 +106,68 @@ export class RunSignupProvider {
     }
 
     const data = await response.json();
-    return this.transformRaceData([data])[0];
+    const races = this.transformRaceData(data.race ? [data] : []);
+    return races.length > 0 ? races[0] : null;
+  }
+
+  /**
+   * Get available events for a race
+   */
+  async getRaceEvents(raceId: string) {
+    const url = this.createAuthenticatedUrl(`/race/${raceId}`);
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`RunSignup API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.race?.events || [];
   }
 
   /**
    * Get results for a specific race and event
    */
   async getResults(raceId: string, eventId?: string) {
-    const params: Record<string, string> = {};
-    if (eventId) {
-      params.event_id = eventId;
+    // If no eventId provided, get all events and find the one with most results
+    if (!eventId) {
+      const events = await this.getRaceEvents(raceId);
+      console.log(`Found ${events.length} events for race ${raceId}:`, events.map(e => ({ id: e.event_id, name: e.name })));
+      
+      if (events.length === 0) {
+        return [];
+      }
+      
+      // Check each event to find the one with most participants
+      let bestEvent = null;
+      let maxResults = 0;
+      
+      for (const event of events) {
+        try {
+          console.log(`Checking event ${event.event_id} (${event.name})...`);
+          const eventResults = await this.getResults(raceId, event.event_id.toString());
+          console.log(`Event ${event.event_id} has ${eventResults.length} results`);
+          
+          if (eventResults.length > maxResults) {
+            maxResults = eventResults.length;
+            bestEvent = event.event_id.toString();
+          }
+        } catch (error) {
+          console.log(`Error checking event ${event.event_id}:`, error);
+        }
+      }
+      
+      console.log(`Best event: ${bestEvent} with ${maxResults} results`);
+      
+      if (bestEvent) {
+        return this.getResults(raceId, bestEvent);
+      }
+      return [];
     }
+
+    const params: Record<string, string> = {
+      event_id: eventId
+    };
 
     const url = this.createAuthenticatedUrl(`/race/${raceId}/results/get-results`, params);
     const response = await fetch(url);
@@ -126,7 +177,16 @@ export class RunSignupProvider {
     }
 
     const data = await response.json();
-    return this.transformResultsData(data.results || []);
+    
+    // Handle different response structures
+    let results = [];
+    if (data.individual_results_sets && data.individual_results_sets.length > 0) {
+      results = data.individual_results_sets[0].results || [];
+    } else if (data.results) {
+      results = data.results;
+    }
+    
+    return this.transformResultsData(results);
   }
 
   /**

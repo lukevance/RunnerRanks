@@ -635,6 +635,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get race details first
       const raceData = await runSignupProvider.getRace(raceId);
+      if (!raceData) {
+        return res.status(400).json({ error: `Race ${raceId} not found` });
+      }
       console.log(`Found race: ${raceData.name}`);
       
       // Get results for the specific event or all events
