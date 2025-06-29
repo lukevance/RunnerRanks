@@ -177,6 +177,7 @@ export class RunSignupProvider {
     }
 
     const data = await response.json();
+    console.log(`RunSignup API response for event ${eventId}:`, JSON.stringify(data).substring(0, 500));
     
     // Handle different response structures
     let results = [];
@@ -185,6 +186,8 @@ export class RunSignupProvider {
     } else if (data.results) {
       results = data.results;
     }
+    
+    console.log(`Found ${results.length} raw results, first result:`, results[0] ? JSON.stringify(results[0]).substring(0, 300) : 'none');
     
     return this.transformResultsData(results);
   }
@@ -222,28 +225,33 @@ export class RunSignupProvider {
    * Transform RunSignup results data to our internal format
    */
   private transformResultsData(results: RunSignupResult[]) {
-    return results.map(result => {
-      // RunSignup can have user data or registration data
-      const userData = result.user;
-      const regData = result.registration;
-      
-      const firstName = userData?.first_name || regData?.first_name || '';
-      const lastName = userData?.last_name || regData?.last_name || '';
-      
-      return {
-        name: `${firstName} ${lastName}`.trim(),
-        age: regData?.age,
-        gender: this.normalizeGender(userData?.gender || regData?.gender),
-        city: regData?.city,
-        state: regData?.state,
-        email: userData?.email,
-        finish_time: result.results?.chip_time || result.results?.gun_time,
-        overall_place: result.results?.overall_place,
-        gender_place: result.results?.gender_place,
-        age_group_place: result.results?.division_place,
-        sourceProvider: 'runsignup',
-        sourceResultId: result.participant_id.toString()
-      };
+    return results.map((result, index) => {
+      try {
+        // RunSignup can have user data or registration data
+        const userData = result.user;
+        const regData = result.registration;
+        
+        const firstName = userData?.first_name || regData?.first_name || '';
+        const lastName = userData?.last_name || regData?.last_name || '';
+        
+        return {
+          name: `${firstName} ${lastName}`.trim(),
+          age: regData?.age,
+          gender: this.normalizeGender(userData?.gender || regData?.gender),
+          city: regData?.city,
+          state: regData?.state,
+          email: userData?.email,
+          finish_time: result.results?.chip_time || result.results?.gun_time || '0:00:00',
+          overall_place: result.results?.overall_place || 0,
+          gender_place: result.results?.gender_place || null,
+          age_group_place: result.results?.division_place || null,
+          sourceProvider: 'runsignup',
+          sourceResultId: result.participant_id?.toString() || `unknown_${index}`
+        };
+      } catch (error) {
+        console.error(`Error transforming result ${index}:`, error, 'Result:', JSON.stringify(result).substring(0, 200));
+        throw error;
+      }
     });
   }
 
