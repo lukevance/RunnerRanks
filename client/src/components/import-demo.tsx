@@ -166,10 +166,15 @@ export function ImportDemo() {
     },
     onSuccess: (data) => {
       setImportResult(data.importResults);
+      setImporting(false);
       queryClient.invalidateQueries({ queryKey: ['/api/leaderboard'] });
     },
     onError: (error) => {
       console.error('Import failed:', error);
+      setImporting(false);
+    },
+    onSettled: () => {
+      setImporting(false);
     }
   });
 
