@@ -610,6 +610,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Official RunSignup API endpoint
+  app.post("/api/import/runsignup-api", async (req, res) => {
+    try {
+      const { raceId, eventId, raceName } = req.body;
+      
+      if (!raceId) {
+        return res.status(400).json({ error: "Race ID is required" });
+      }
+
+      // Check if we have API credentials
+      const apiKey = process.env.RUNSIGNUP_API_KEY;
+      const apiSecret = process.env.RUNSIGNUP_API_SECRET;
+      
+      if (!apiKey || !apiSecret) {
+        return res.status(400).json({ 
+          error: "RunSignup API credentials not configured. Please contact admin to set up API access." 
+        });
+      }
+
+      console.log(`Starting RunSignup API import for race ${raceId}${eventId ? `, event ${eventId}` : ''}`);
+
+      const runSignupProvider = new RunSignupProvider(apiKey, apiSecret);
+      
+      // Get race details first
+      const raceData = await runSignupProvider.getRace(raceId);
+      console.log(`Found race: ${raceData.name}`);
+      
+      // Get results for the specific event or all events
+      const resultsData = await runSignupProvider.getResults(raceId, eventId);
+      console.log(`Found ${resultsData.length} results`);
+
+      if (resultsData.length === 0) {
+        return res.status(400).json({ 
+          error: `No results found for race ${raceId}${eventId ? ` event ${eventId}` : ''}. The race may not have results published yet.`
+        });
+      }
+
+      // Create race record
+      const race = await storage.createRace({
+        name: raceName || raceData.name,
+        date: raceData.date,
+        distance: raceData.distance,
+        distanceMiles: raceData.distanceMiles,
+        city: raceData.city,
+        state: raceData.state,
+        startTime: raceData.startTime,
+        totalFinishers: resultsData.length,
+        averageTime: "00:00:00" // Will be calculated
+      });
+
+      console.log(`Created race record with ID ${race.id}`);
+
+      // Import results with runner matching
+      const importResults = {
+        totalResults: resultsData.length,
+        imported: 0,
+        matched: 0,
+        newRunners: 0,
+        needsReview: 0,
+        errors: [] as string[]
+      };
+
+      for (const result of resultsData) {
+        try {
+          const rawRunnerData: RawRunnerData = {
+            name: result.name,
+            age: result.age,
+            gender: result.gender,
+            city: result.city,
+            state: result.state,
+            finishTime: result.finish_time || "0:00:00"
+          };
+
+          const { runner, matchScore, needsReview } = await runnerMatcher.matchRunner(rawRunnerData, race.id.toString(), storage);
+          
+          await storage.createResult({
+            runnerId: runner.id,
+            raceId: race.id,
+            finishTime: result.finish_time || "0:00:00",
+            overallPlace: result.overall_place || 0,
+            genderPlace: result.gender_place || null,
+            ageGroupPlace: result.age_group_place || null,
+            sourceProvider: "runsignup-api",
+            rawRunnerName: rawRunnerData.name,
+            matchingScore: matchScore,
+            needsReview: needsReview
+          });
+
+          importResults.imported++;
+          if (matchScore >= 95) {
+            importResults.matched++;
+          } else if (matchScore === 0) {
+            importResults.newRunners++;
+          } else if (needsReview) {
+            importResults.needsReview++;
+          }
+
+        } catch (error) {
+          console.error("Error processing result:", error);
+          importResults.errors.push(`Failed to process result for ${result.name}`);
+        }
+      }
+
+      console.log(`Import complete: ${importResults.imported} results imported`);
+
+      res.json({
+        success: true,
+        race: race,
+        importResults
+      });
+
+    } catch (error) {
+      console.error("RunSignup API import error:", error);
+      res.status(500).json({ error: "Failed to import from RunSignup API: " + (error as Error).message });
+    }
+  });
+
   app.post("/api/import/raceroster", async (req, res) => {
     try {
       const { url } = req.body;

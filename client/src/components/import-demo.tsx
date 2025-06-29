@@ -105,8 +105,11 @@ const EXAMPLE_RESULTS_DATA = [
 
 export function ImportDemo() {
   const [importUrl, setImportUrl] = useState("");
-  const [importType, setImportType] = useState<"url" | "csv">("url");
+  const [importType, setImportType] = useState<"url" | "csv" | "api">("url");
   const [csvData, setCsvData] = useState("");
+  const [raceId, setRaceId] = useState("");
+  const [eventId, setEventId] = useState("");
+  const [raceName, setRaceName] = useState("");
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const queryClient = useQueryClient();
@@ -136,6 +139,17 @@ export function ImportDemo() {
         body = {
           url: importUrl,
           sourceProvider: provider
+        };
+      } else if (importType === "api") {
+        if (!raceId.trim()) {
+          throw new Error('Please enter a Race ID');
+        }
+        
+        endpoint = '/api/import/runsignup-api';
+        body = {
+          raceId: raceId.trim(),
+          eventId: eventId.trim() || undefined,
+          raceName: raceName.trim() || undefined
         };
       } else {
         if (!csvData.trim()) {
