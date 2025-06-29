@@ -406,18 +406,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const raceNameMatch = html.match(/<title>([^<]+) Results<\/title>/);
       const extractedRaceName = raceNameMatch ? raceNameMatch[1] : (raceName || `Race ${raceId}`);
       
-      // Look for JSON data in the page (RunSignup often embeds data in script tags)
-      const jsonMatch = html.match(/window\.RSU\.raceResults\s*=\s*({.*?});/);
+      // Extract event IDs from the page (RunSignup embeds these for different race distances)
+      const eventIdMatches = html.match(/Results\.addEventInfo\((\d+),\s*"([^"]+)"\)/g);
       let resultsData = [];
+      let eventInfo = { eventId: null, distance: "Unknown" };
       
-      if (jsonMatch) {
-        try {
-          const data = JSON.parse(jsonMatch[1]);
-          if (data.individual_results) {
-            resultsData = data.individual_results;
+      if (eventIdMatches) {
+        // Try each event ID to find one with actual results
+        for (const match of eventIdMatches) {
+          const eventMatch = match.match(/Results\.addEventInfo\((\d+),\s*"([^"]+)"\)/);
+          if (eventMatch) {
+            const eventId = eventMatch[1];
+            const distance = eventMatch[2];
+            
+            try {
+              const apiUrl = `https://runsignup.com/Rest/race/${raceId}/results/get-results?event_id=${eventId}&format=json`;
+              const apiResponse = await fetch(apiUrl);
+              const apiData = await apiResponse.json();
+              
+              if (apiData.individual_results_sets && apiData.individual_results_sets.length > 0) {
+                resultsData = apiData.individual_results_sets[0].results || [];
+                eventInfo = { eventId, distance };
+                console.log(`Found ${resultsData.length} results for ${distance} (event ${eventId})`);
+                break; // Use the first event with results
+              }
+            } catch (apiError) {
+              console.log(`Failed to fetch results for event ${eventId}:`, apiError);
+            }
           }
-        } catch (parseError) {
-          console.log("Failed to parse embedded JSON data:", parseError);
         }
       }
       
