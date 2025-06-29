@@ -409,7 +409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extract event IDs from the page (RunSignup embeds these for different race distances)
       const eventIdMatches = html.match(/Results\.addEventInfo\((\d+),\s*"([^"]+)"\)/g);
       let resultsData = [];
-      let eventInfo = { eventId: null, distance: "Unknown" };
+      let eventInfo = { eventId: null as string | null, distance: "Unknown" };
       
       if (eventIdMatches) {
         // Try each event ID to find one with actual results
@@ -439,20 +439,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (resultsData.length === 0) {
         return res.status(400).json({ 
-          error: "RunSignup loads results dynamically with JavaScript. To import this race, please:\n1. Visit the RunSignup results page\n2. Look for an 'Export' or 'Download CSV' option\n3. Use the CSV import feature instead\n\nThe race name was successfully detected as: " + extractedRaceName,
+          error: `No results found for ${extractedRaceName}. Checked ${eventIdMatches?.length || 0} events but none contained race results. This might be a future race or the results may not be published yet.`,
           extractedRaceName,
           raceId,
           resultSetId,
-          suggestion: "Use CSV import for reliable data extraction"
+          eventsChecked: eventIdMatches?.length || 0
         });
       }
 
-      // Create race entry with proper schema fields
+      // Normalize distance for our schema
+      const normalizedDistance = eventInfo.distance.toLowerCase().includes('marathon') && !eventInfo.distance.toLowerCase().includes('half') 
+        ? 'marathon' 
+        : eventInfo.distance.toLowerCase().includes('half') 
+        ? 'half-marathon'
+        : eventInfo.distance.toLowerCase().includes('10k')
+        ? '10k'
+        : eventInfo.distance.toLowerCase().includes('5k')
+        ? '5k'
+        : 'other';
+
+      const distanceMiles = normalizedDistance === 'marathon' ? '26.2' 
+        : normalizedDistance === 'half-marathon' ? '13.1'
+        : normalizedDistance === '10k' ? '6.2'
+        : normalizedDistance === '5k' ? '3.1'
+        : '0';
+
+      // Create race entry with extracted information
       const race = await storage.createRace({
-        name: extractedRaceName,
+        name: `${extractedRaceName} - ${eventInfo.distance}`,
         date: new Date().toISOString().split('T')[0],
-        distance: "marathon", // Default assumption
-        distanceMiles: "26.2",
+        distance: normalizedDistance,
+        distanceMiles: distanceMiles,
         city: "TBD",
         state: "TBD", 
         startTime: "08:00:00",
@@ -481,7 +498,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             finishTime: result.finish_time || result.chip_time || result.gun_time || "0:00:00"
           };
 
-          const { runner, matchScore, needsReview } = await runnerMatcher.matchRunner(rawRunnerData, race.id, storage);
+          const { runner, matchScore, needsReview } = await runnerMatcher.matchRunner(rawRunnerData, race.id.toString(), storage);
           
           // Create result entry with proper schema fields
           await storage.createResult({
