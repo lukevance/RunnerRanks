@@ -4,22 +4,27 @@ import {
   results,
   raceSeries,
   raceSeriesRaces,
+  runnerMatches,
   type Runner, 
   type Race, 
   type Result,
   type RaceSeries,
   type RaceSeriesRace,
+  type RunnerMatch,
   type InsertRunner, 
   type InsertRace, 
   type InsertResult,
   type InsertRaceSeries,
   type InsertRaceSeriesRace,
+  type InsertRunnerMatch,
   type LeaderboardEntry,
   type RunnerWithStats,
   type RaceSeriesWithRaces,
   type SeriesStanding,
   type SeriesLeaderboard
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc, asc, and, or, ilike, sql, count } from "drizzle-orm";
 
 export interface IStorage {
   // Runners
@@ -73,6 +78,405 @@ export interface IStorage {
     totalPoints: number;
     rank: number;
   })[]>;
+  
+  // Runner Matching
+  createRunnerMatch(match: InsertRunnerMatch): Promise<RunnerMatch>;
+}
+
+export class DatabaseStorage implements IStorage {
+  // Runners
+  async getRunner(id: number): Promise<Runner | undefined> {
+    const [runner] = await db.select().from(runners).where(eq(runners.id, id));
+    return runner || undefined;
+  }
+
+  async getRunnerByEmail(email: string): Promise<Runner | undefined> {
+    const [runner] = await db.select().from(runners).where(eq(runners.email, email));
+    return runner || undefined;
+  }
+
+  async createRunner(insertRunner: InsertRunner): Promise<Runner> {
+    const [runner] = await db.insert(runners).values(insertRunner).returning();
+    return runner;
+  }
+
+  async getAllRunners(): Promise<Runner[]> {
+    return await db.select().from(runners).orderBy(asc(runners.name));
+  }
+
+  // Races
+  async getRace(id: number): Promise<Race | undefined> {
+    const [race] = await db.select().from(races).where(eq(races.id, id));
+    return race || undefined;
+  }
+
+  async createRace(insertRace: InsertRace): Promise<Race> {
+    const [race] = await db.insert(races).values(insertRace).returning();
+    return race;
+  }
+
+  async getAllRaces(): Promise<Race[]> {
+    return await db.select().from(races).orderBy(desc(races.date));
+  }
+
+  // Results
+  async getResult(id: number): Promise<Result | undefined> {
+    const [result] = await db.select().from(results).where(eq(results.id, id));
+    return result || undefined;
+  }
+
+  async createResult(insertResult: InsertResult): Promise<Result> {
+    const [result] = await db.insert(results).values(insertResult).returning();
+    return result;
+  }
+
+  async getResultsByRunner(runnerId: number): Promise<(Result & { race: Race })[]> {
+    return await db
+      .select()
+      .from(results)
+      .innerJoin(races, eq(results.raceId, races.id))
+      .where(eq(results.runnerId, runnerId))
+      .orderBy(desc(races.date));
+  }
+
+  async getResultsByRace(raceId: number): Promise<(Result & { runner: Runner })[]> {
+    return await db
+      .select()
+      .from(results)
+      .innerJoin(runners, eq(results.runnerId, runners.id))
+      .where(eq(results.raceId, raceId))
+      .orderBy(asc(results.overallPlace));
+  }
+
+  // Leaderboard queries
+  async getLeaderboard(filters?: {
+    distance?: string;
+    gender?: string;
+    ageGroup?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<LeaderboardEntry[]> {
+    let query = db
+      .select({
+        id: results.id,
+        runner: runners,
+        race: races,
+        result: results,
+      })
+      .from(results)
+      .innerJoin(runners, eq(results.runnerId, runners.id))
+      .innerJoin(races, eq(results.raceId, races.id));
+
+    // Apply filters
+    const conditions = [];
+    
+    if (filters?.distance) {
+      conditions.push(eq(races.distance, filters.distance));
+    }
+    
+    if (filters?.gender) {
+      conditions.push(eq(runners.gender, filters.gender));
+    }
+    
+    if (filters?.ageGroup) {
+      const [minAge, maxAge] = filters.ageGroup.split('-').map(Number);
+      if (!isNaN(minAge) && !isNaN(maxAge)) {
+        conditions.push(and(
+          sql`${runners.age} >= ${minAge}`,
+          sql`${runners.age} <= ${maxAge}`
+        ));
+      }
+    }
+    
+    if (filters?.search) {
+      conditions.push(or(
+        ilike(runners.name, `%${filters.search}%`),
+        ilike(races.name, `%${filters.search}%`)
+      ));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+
+    query = query.orderBy(asc(sql`EXTRACT(EPOCH FROM ${results.finishTime}::interval)`));
+
+    if (filters?.limit) {
+      query = query.limit(filters.limit);
+    }
+    
+    if (filters?.offset) {
+      query = query.offset(filters.offset);
+    }
+
+    return await query;
+  }
+
+  async getRunnerWithStats(id: number): Promise<RunnerWithStats | undefined> {
+    const runner = await this.getRunner(id);
+    if (!runner) return undefined;
+
+    const runnerResults = await this.getResultsByRunner(id);
+    
+    // Calculate stats
+    const marathonTimes = runnerResults
+      .filter(r => r.race.distance === 'Marathon')
+      .map(r => r.finishTime)
+      .sort();
+    
+    const halfMarathonTimes = runnerResults
+      .filter(r => r.race.distance === 'Half Marathon')
+      .map(r => r.finishTime)
+      .sort();
+
+    const currentYear = new Date().getFullYear();
+    const racesThisYear = runnerResults.filter(r => 
+      new Date(r.race.date).getFullYear() === currentYear
+    ).length;
+
+    const ageGroupWins = runnerResults.filter(r => r.ageGroupPlace === 1).length;
+
+    return {
+      ...runner,
+      marathonPR: marathonTimes[0],
+      halfMarathonPR: halfMarathonTimes[0],
+      racesThisYear,
+      ageGroupWins,
+      results: runnerResults
+    };
+  }
+
+  // Race Series
+  async createRaceSeries(insertSeries: InsertRaceSeries): Promise<RaceSeries> {
+    const [series] = await db.insert(raceSeries).values({
+      ...insertSeries,
+      createdAt: new Date().toISOString(),
+      createdBy: 'admin' // TODO: Use actual user when auth is implemented
+    }).returning();
+    return series;
+  }
+
+  async getRaceSeries(id: number): Promise<RaceSeriesWithRaces | undefined> {
+    const [series] = await db.select().from(raceSeries).where(eq(raceSeries.id, id));
+    if (!series) return undefined;
+
+    const seriesRaces = await this.getSeriesRaces(id);
+    const participantCount = await this.getSeriesParticipantCount(id);
+
+    return {
+      ...series,
+      races: seriesRaces,
+      totalRaces: seriesRaces.length,
+      participantCount
+    };
+  }
+
+  async getAllRaceSeries(): Promise<RaceSeriesWithRaces[]> {
+    const allSeries = await db.select().from(raceSeries).orderBy(desc(raceSeries.year));
+    
+    return await Promise.all(allSeries.map(async (series) => {
+      const seriesRaces = await this.getSeriesRaces(series.id);
+      const participantCount = await this.getSeriesParticipantCount(series.id);
+      
+      return {
+        ...series,
+        races: seriesRaces,
+        totalRaces: seriesRaces.length,
+        participantCount
+      };
+    }));
+  }
+
+  async updateRaceSeries(id: number, updates: Partial<InsertRaceSeries>): Promise<RaceSeries | undefined> {
+    const [updated] = await db
+      .update(raceSeries)
+      .set(updates)
+      .where(eq(raceSeries.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteRaceSeries(id: number): Promise<boolean> {
+    // First delete associated race series races
+    await db.delete(raceSeriesRaces).where(eq(raceSeriesRaces.seriesId, id));
+    
+    // Then delete the series
+    const result = await db.delete(raceSeries).where(eq(raceSeries.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Race Series Races
+  async addRaceToSeries(seriesId: number, raceId: number, options?: {
+    seriesRaceNumber?: number;
+    pointsMultiplier?: string;
+  }): Promise<RaceSeriesRace> {
+    const [seriesRace] = await db.insert(raceSeriesRaces).values({
+      seriesId,
+      raceId,
+      seriesRaceNumber: options?.seriesRaceNumber || 1,
+      pointsMultiplier: options?.pointsMultiplier || '1.0'
+    }).returning();
+    return seriesRace;
+  }
+
+  async removeRaceFromSeries(seriesId: number, raceId: number): Promise<boolean> {
+    const result = await db
+      .delete(raceSeriesRaces)
+      .where(and(
+        eq(raceSeriesRaces.seriesId, seriesId),
+        eq(raceSeriesRaces.raceId, raceId)
+      ));
+    return result.rowCount > 0;
+  }
+
+  async getSeriesRaces(seriesId: number): Promise<(RaceSeriesRace & { race: Race })[]> {
+    return await db
+      .select()
+      .from(raceSeriesRaces)
+      .innerJoin(races, eq(raceSeriesRaces.raceId, races.id))
+      .where(eq(raceSeriesRaces.seriesId, seriesId))
+      .orderBy(asc(raceSeriesRaces.seriesRaceNumber));
+  }
+
+  // Series Leaderboards
+  async getSeriesLeaderboard(seriesId: number): Promise<SeriesLeaderboard> {
+    const series = await db.select().from(raceSeries).where(eq(raceSeries.id, seriesId));
+    if (!series[0]) {
+      throw new Error(`Series ${seriesId} not found`);
+    }
+
+    const seriesRaces = await this.getSeriesRaces(seriesId);
+    const raceIds = seriesRaces.map(sr => sr.race.id);
+
+    if (raceIds.length === 0) {
+      return {
+        series: series[0],
+        standings: [],
+        totalParticipants: 0
+      };
+    }
+
+    // Get all results for races in this series
+    const allResults = await db
+      .select()
+      .from(results)
+      .innerJoin(runners, eq(results.runnerId, runners.id))
+      .innerJoin(races, eq(results.raceId, races.id))
+      .where(sql`${results.raceId} IN (${sql.join(raceIds, sql`, `)})`);
+
+    // Group by runner and calculate standings
+    const runnerResults = new Map();
+    
+    for (const result of allResults) {
+      const runnerId = result.results.runnerId;
+      if (!runnerResults.has(runnerId)) {
+        runnerResults.set(runnerId, []);
+      }
+      
+      const points = this.calculateRacePoints(result.results, result.races);
+      runnerResults.get(runnerId).push({
+        ...result.results,
+        race: result.races,
+        points
+      });
+    }
+
+    // Calculate standings
+    const standings: SeriesStanding[] = [];
+    
+    for (const [runnerId, raceResults] of runnerResults) {
+      if (raceResults.length < series[0].minimumRaces) continue;
+
+      const runner = await this.getRunner(runnerId);
+      if (!runner) continue;
+
+      const totalPoints = raceResults.reduce((sum: number, r: any) => sum + r.points, 0);
+      const averagePoints = totalPoints / raceResults.length;
+      const bestRacePoints = Math.max(...raceResults.map((r: any) => r.points));
+
+      standings.push({
+        runner,
+        totalPoints,
+        averagePoints,
+        racesCompleted: raceResults.length,
+        bestRacePoints,
+        results: raceResults,
+        rank: 0 // Will be set after sorting
+      });
+    }
+
+    // Sort by total points and assign ranks
+    standings.sort((a, b) => b.totalPoints - a.totalPoints);
+    standings.forEach((standing, index) => {
+      standing.rank = index + 1;
+    });
+
+    return {
+      series: series[0],
+      standings,
+      totalParticipants: standings.length
+    };
+  }
+
+  async getRunnerSeriesHistory(runnerId: number): Promise<(RaceSeries & { 
+    racesCompleted: number; 
+    totalPoints: number;
+    rank: number;
+  })[]> {
+    // Get all series the runner has participated in
+    const participatedSeries = await db
+      .selectDistinct({ series: raceSeries })
+      .from(raceSeries)
+      .innerJoin(raceSeriesRaces, eq(raceSeries.id, raceSeriesRaces.seriesId))
+      .innerJoin(results, eq(raceSeriesRaces.raceId, results.raceId))
+      .where(eq(results.runnerId, runnerId));
+
+    const history = [];
+    
+    for (const { series } of participatedSeries) {
+      const leaderboard = await this.getSeriesLeaderboard(series.id);
+      const runnerStanding = leaderboard.standings.find(s => s.runner.id === runnerId);
+      
+      if (runnerStanding) {
+        history.push({
+          ...series,
+          racesCompleted: runnerStanding.racesCompleted,
+          totalPoints: runnerStanding.totalPoints,
+          rank: runnerStanding.rank
+        });
+      }
+    }
+
+    return history.sort((a, b) => b.year - a.year);
+  }
+
+  // Runner Matching
+  async createRunnerMatch(insertMatch: InsertRunnerMatch): Promise<RunnerMatch> {
+    const [match] = await db.insert(runnerMatches).values(insertMatch).returning();
+    return match;
+  }
+
+  // Private helper methods
+  private async getSeriesParticipantCount(seriesId: number): Promise<number> {
+    const seriesRaces = await this.getSeriesRaces(seriesId);
+    const raceIds = seriesRaces.map(sr => sr.race.id);
+    
+    if (raceIds.length === 0) return 0;
+
+    const [result] = await db
+      .select({ count: count(sql`DISTINCT ${results.runnerId}`) })
+      .from(results)
+      .where(sql`${results.raceId} IN (${sql.join(raceIds, sql`, `)})`);
+    
+    return result?.count || 0;
+  }
+
+  private calculateRacePoints(result: Result, race: Race): number {
+    const basePoints = Math.max(0, 100 - result.overallPlace + 1);
+    const sizeBonus = Math.min(50, Math.floor(race.totalFinishers / 100) * 5);
+    return basePoints + sizeBonus;
+  }
 }
 
 export class MemStorage implements IStorage {
@@ -700,6 +1104,15 @@ export class MemStorage implements IStorage {
     return Math.round(basePoints * sizeMultiplier);
   }
 
+  async createRunnerMatch(insertMatch: InsertRunnerMatch): Promise<RunnerMatch> {
+    // For MemStorage, we don't need to persist these, just return a dummy record
+    return {
+      id: Date.now(),
+      ...insertMatch,
+      createdAt: new Date().toISOString()
+    };
+  }
+
   private timeToSeconds(timeStr: string): number {
     const parts = timeStr.split(':').map(Number);
     if (parts.length === 2) {
@@ -711,4 +1124,4 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
