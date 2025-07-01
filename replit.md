@@ -6,7 +6,8 @@ A comprehensive running leaderboard platform that aggregates and displays local 
 Built with:
 - Frontend: React + TypeScript + Tailwind CSS + shadcn/ui components
 - Backend: Express.js + TypeScript
-- Storage: In-memory storage with comprehensive data models
+- Database: PostgreSQL with Drizzle ORM
+- Storage: Persistent database storage with comprehensive data models
 - API Integration: RunSignup and RaceRoster provider support
 
 ## Project Architecture
@@ -28,9 +29,10 @@ Built with:
 - **Runner Matching**: Fuzzy matching system with confidence scoring (95%+ auto-match, 85-94% high confidence, 60-84% needs review)
 
 #### Storage System
-- In-memory storage (MemStorage) with complete CRUD operations
-- Sample data initialization with realistic race results
+- PostgreSQL database with Drizzle ORM for persistent data storage
+- Complete CRUD operations with relational integrity
 - Advanced query capabilities for leaderboards and analytics
+- Database tables: runners, races, results, race_series, race_series_races, runner_matches
 
 #### API Structure
 - RESTful endpoints for all data operations
@@ -38,6 +40,14 @@ Built with:
 - Integration endpoints for external race data providers
 
 ## Recent Changes
+
+### July 1, 2025 - Database Migration to PostgreSQL
+✓ Migrated from in-memory storage to persistent PostgreSQL database
+✓ Implemented complete DatabaseStorage class with Drizzle ORM
+✓ Created all database tables: runners, races, results, race_series, race_series_races, runner_matches
+✓ Configured proper database relations and foreign key constraints
+✓ Updated runner matching system to log match decisions for audit trail
+✓ Maintained full API compatibility during storage layer transition
 
 ### June 29, 2025 - Race Series Feature Complete & RunSignup URL Import
 ✓ Built complete race series management system as admin-only feature
