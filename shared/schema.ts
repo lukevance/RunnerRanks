@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, decimal, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -83,6 +83,7 @@ export const raceSeries = pgTable("race_series", {
   minimumRaces: integer("minimum_races").notNull().default(2),
   maxRacesForScore: integer("max_races_for_score"), // null = count all races
   isActive: boolean("is_active").notNull().default(true),
+  isPrivate: boolean("is_private").notNull().default(false), // If true, requires manual runner enrollment
   createdAt: text("created_at").notNull(),
   createdBy: text("created_by"), // Admin who created the series
 });
@@ -96,6 +97,16 @@ export const raceSeriesRaces = pgTable("race_series_races", {
   pointsMultiplier: decimal("points_multiplier", { precision: 3, scale: 2 }).default("1.00"), // For weighted races
   isCountedInSeries: boolean("is_counted_in_series").notNull().default(true),
   addedAt: text("added_at").notNull(),
+});
+
+// Table for managing runners manually added to private series
+export const raceSeriesParticipants = pgTable("race_series_participants", {
+  id: serial("id").primaryKey(),
+  seriesId: integer("series_id").notNull().references(() => raceSeries.id),
+  runnerId: integer("runner_id").notNull().references(() => runners.id),
+  addedBy: text("added_by"), // Admin who added the runner
+  addedAt: text("added_at").notNull(),
+  notes: text("notes"), // Optional notes about why runner was added
 });
 
 export const insertRunnerSchema = createInsertSchema(runners).omit({
@@ -124,12 +135,18 @@ export const insertRaceSeriesRaceSchema = createInsertSchema(raceSeriesRaces).om
   id: true,
 });
 
+export const insertRaceSeriesParticipantSchema = createInsertSchema(raceSeriesParticipants).omit({
+  id: true,
+  addedAt: true,
+});
+
 export type InsertRunner = z.infer<typeof insertRunnerSchema>;
 export type InsertRace = z.infer<typeof insertRaceSchema>;
 export type InsertResult = z.infer<typeof insertResultSchema>;
 export type InsertRunnerMatch = z.infer<typeof insertRunnerMatchSchema>;
 export type InsertRaceSeries = z.infer<typeof insertRaceSeriesSchema>;
 export type InsertRaceSeriesRace = z.infer<typeof insertRaceSeriesRaceSchema>;
+export type InsertRaceSeriesParticipant = z.infer<typeof insertRaceSeriesParticipantSchema>;
 
 export type Runner = typeof runners.$inferSelect;
 export type Race = typeof races.$inferSelect;
@@ -137,6 +154,7 @@ export type Result = typeof results.$inferSelect;
 export type RunnerMatch = typeof runnerMatches.$inferSelect;
 export type RaceSeries = typeof raceSeries.$inferSelect;
 export type RaceSeriesRace = typeof raceSeriesRaces.$inferSelect;
+export type RaceSeriesParticipant = typeof raceSeriesParticipants.$inferSelect;
 
 // Extended types for API responses
 export type LeaderboardEntry = {
