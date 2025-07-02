@@ -866,6 +866,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Private Series Participants Management
+  app.get("/api/race-series/:id/participants", async (req, res) => {
+    try {
+      const seriesId = parseInt(req.params.id);
+      const participants = await storage.getPrivateSeriesParticipants(seriesId);
+      res.json(participants);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch series participants" });
+    }
+  });
+
+  app.post("/api/race-series/:seriesId/participants/:runnerId", async (req, res) => {
+    try {
+      const seriesId = parseInt(req.params.seriesId);
+      const runnerId = parseInt(req.params.runnerId);
+      const { notes } = req.body;
+      
+      // Check if runner is already in the series
+      const isAlreadyParticipant = await storage.isRunnerInPrivateSeries(seriesId, runnerId);
+      if (isAlreadyParticipant) {
+        return res.status(400).json({ error: "Runner is already a participant in this series" });
+      }
+      
+      const participant = await storage.addRunnerToPrivateSeries(seriesId, runnerId, "admin", notes);
+      res.json(participant);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to add runner to private series" });
+    }
+  });
+
+  app.delete("/api/race-series/:seriesId/participants/:runnerId", async (req, res) => {
+    try {
+      const seriesId = parseInt(req.params.seriesId);
+      const runnerId = parseInt(req.params.runnerId);
+      
+      const removed = await storage.removeRunnerFromPrivateSeries(seriesId, runnerId);
+      if (!removed) {
+        return res.status(404).json({ error: "Runner not found in private series" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove runner from private series" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

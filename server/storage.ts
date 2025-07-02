@@ -4,18 +4,21 @@ import {
   results,
   raceSeries,
   raceSeriesRaces,
+  raceSeriesParticipants,
   runnerMatches,
   type Runner, 
   type Race, 
   type Result,
   type RaceSeries,
   type RaceSeriesRace,
+  type RaceSeriesParticipant,
   type RunnerMatch,
   type InsertRunner, 
   type InsertRace, 
   type InsertResult,
   type InsertRaceSeries,
   type InsertRaceSeriesRace,
+  type InsertRaceSeriesParticipant,
   type InsertRunnerMatch,
   type LeaderboardEntry,
   type RunnerWithStats,
@@ -81,6 +84,12 @@ export interface IStorage {
   
   // Runner Matching
   createRunnerMatch(match: InsertRunnerMatch): Promise<RunnerMatch>;
+  
+  // Private Series Participants
+  addRunnerToPrivateSeries(seriesId: number, runnerId: number, addedBy: string, notes?: string): Promise<RaceSeriesParticipant>;
+  removeRunnerFromPrivateSeries(seriesId: number, runnerId: number): Promise<boolean>;
+  getPrivateSeriesParticipants(seriesId: number): Promise<(RaceSeriesParticipant & { runner: Runner })[]>;
+  isRunnerInPrivateSeries(seriesId: number, runnerId: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -365,11 +374,24 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(races, eq(results.raceId, races.id))
       .where(sql`${results.raceId} IN (${sql.join(raceIds, sql`, `)})`);
 
+    // For private series, filter by manually added participants
+    let eligibleRunnerIds: Set<number> | null = null;
+    if (series[0].isPrivate) {
+      const privateParticipants = await this.getPrivateSeriesParticipants(seriesId);
+      eligibleRunnerIds = new Set(privateParticipants.map(p => p.runner.id));
+    }
+
     // Group by runner and calculate standings
     const runnerResults = new Map();
     
     for (const result of allResults) {
       const runnerId = result.results.runnerId;
+      
+      // For private series, only include manually added runners
+      if (eligibleRunnerIds && !eligibleRunnerIds.has(runnerId)) {
+        continue;
+      }
+      
       if (!runnerResults.has(runnerId)) {
         runnerResults.set(runnerId, []);
       }
@@ -455,6 +477,68 @@ export class DatabaseStorage implements IStorage {
   async createRunnerMatch(insertMatch: InsertRunnerMatch): Promise<RunnerMatch> {
     const [match] = await db.insert(runnerMatches).values(insertMatch).returning();
     return match;
+  }
+
+  // Private Series Participants
+  async addRunnerToPrivateSeries(seriesId: number, runnerId: number, addedBy: string, notes?: string): Promise<RaceSeriesParticipant> {
+    const [participant] = await db.insert(raceSeriesParticipants).values({
+      seriesId,
+      runnerId,
+      addedBy,
+      addedAt: new Date().toISOString(),
+      notes: notes || null
+    }).returning();
+    return participant;
+  }
+
+  async removeRunnerFromPrivateSeries(seriesId: number, runnerId: number): Promise<boolean> {
+    const result = await db
+      .delete(raceSeriesParticipants)
+      .where(and(
+        eq(raceSeriesParticipants.seriesId, seriesId),
+        eq(raceSeriesParticipants.runnerId, runnerId)
+      ));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async getPrivateSeriesParticipants(seriesId: number): Promise<(RaceSeriesParticipant & { runner: Runner })[]> {
+    const results = await db
+      .select({
+        // Participant fields
+        id: raceSeriesParticipants.id,
+        seriesId: raceSeriesParticipants.seriesId,
+        runnerId: raceSeriesParticipants.runnerId,
+        addedBy: raceSeriesParticipants.addedBy,
+        addedAt: raceSeriesParticipants.addedAt,
+        notes: raceSeriesParticipants.notes,
+        // Runner fields
+        runner: runners
+      })
+      .from(raceSeriesParticipants)
+      .innerJoin(runners, eq(raceSeriesParticipants.runnerId, runners.id))
+      .where(eq(raceSeriesParticipants.seriesId, seriesId))
+      .orderBy(asc(runners.name));
+    
+    return results.map(r => ({
+      id: r.id,
+      seriesId: r.seriesId,
+      runnerId: r.runnerId,
+      addedBy: r.addedBy,
+      addedAt: r.addedAt,
+      notes: r.notes,
+      runner: r.runner
+    }));
+  }
+
+  async isRunnerInPrivateSeries(seriesId: number, runnerId: number): Promise<boolean> {
+    const [participant] = await db
+      .select()
+      .from(raceSeriesParticipants)
+      .where(and(
+        eq(raceSeriesParticipants.seriesId, seriesId),
+        eq(raceSeriesParticipants.runnerId, runnerId)
+      ));
+    return !!participant;
   }
 
   // Private helper methods
@@ -1111,6 +1195,30 @@ export class MemStorage implements IStorage {
       ...insertMatch,
       createdAt: new Date().toISOString()
     };
+  }
+
+  // Private Series Participants (stub methods for MemStorage)
+  async addRunnerToPrivateSeries(seriesId: number, runnerId: number, addedBy: string, notes?: string): Promise<RaceSeriesParticipant> {
+    return {
+      id: Date.now(),
+      seriesId,
+      runnerId,
+      addedBy,
+      addedAt: new Date().toISOString(),
+      notes: notes || null
+    };
+  }
+
+  async removeRunnerFromPrivateSeries(seriesId: number, runnerId: number): Promise<boolean> {
+    return true; // Stub implementation
+  }
+
+  async getPrivateSeriesParticipants(seriesId: number): Promise<(RaceSeriesParticipant & { runner: Runner })[]> {
+    return []; // Stub implementation
+  }
+
+  async isRunnerInPrivateSeries(seriesId: number, runnerId: number): Promise<boolean> {
+    return false; // Stub implementation - MemStorage doesn't support private series
   }
 
   private timeToSeconds(timeStr: string): number {
