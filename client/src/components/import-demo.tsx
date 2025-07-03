@@ -509,7 +509,11 @@ Jennifer Wang,26,F,San Francisco,CA,2:48:15,6,3`)}
         <div className="flex items-center space-x-4 mt-6">
           <button
             onClick={handleImport}
-            disabled={importing || importMutation.isPending || (!importUrl.trim() && !csvData.trim())}
+            disabled={importing || importMutation.isPending || (
+              importType === "url" && !importUrl.trim() ||
+              importType === "csv" && !csvData.trim() ||
+              importType === "api" && (!raceId.trim() || !eventId.trim())
+            )}
             className="bg-performance-blue text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
             {importing || importMutation.isPending ? (
