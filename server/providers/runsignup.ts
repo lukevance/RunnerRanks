@@ -21,6 +21,14 @@ export interface RunSignupRace {
   };
 }
 
+export interface RunSignupEvent {
+  event_id: number;
+  name: string;
+  distance: string;
+  start_time: string;
+  isPast: boolean;
+}
+
 export interface RunSignupResult {
   participant_id: number;
   user?: {
@@ -98,7 +106,24 @@ export class RunSignupProvider {
    * Get race details by ID
    */
   async getRace(raceId: string) {
-    const url = this.createAuthenticatedUrl(`/race/${raceId}`);
+    const url = this.createAuthenticatedUrl(`/race/${raceId}`, {
+      future_events_only: 'F',
+      most_recent_events_only: 'F',
+      race_headings: 'F',
+      race_links: 'F',
+      include_waiver: 'F',
+      include_multiple_waivers: 'F',
+      include_participant_caps: 'F',
+      include_age_based_pricing: 'F',
+      include_giveaway_details: 'F',
+      include_questions: 'F',
+      include_addons: 'F',
+      include_membership_settings: 'F',
+      include_corral_settings: 'F',
+      include_donation_settings: 'F',
+      include_extra_date_info: 'F',
+      supports_question_application_types: 'F'
+    });
     const response = await fetch(url);
     
     if (!response.ok) {
@@ -111,10 +136,13 @@ export class RunSignupProvider {
   }
 
   /**
-   * Get available events for a race
+   * Get available events for a race (past events only)
    */
-  async getRaceEvents(raceId: string) {
-    const url = this.createAuthenticatedUrl(`/race/${raceId}`);
+  async getRaceEvents(raceId: string): Promise<RunSignupEvent[]> {
+    const url = this.createAuthenticatedUrl(`/race/${raceId}`, {
+      future_events_only: 'F',
+      most_recent_events_only: 'F'
+    });
     const response = await fetch(url);
     
     if (!response.ok) {
@@ -122,47 +150,28 @@ export class RunSignupProvider {
     }
 
     const data = await response.json();
-    return data.race?.events || [];
+    const now = new Date();
+    
+    if (!data.race?.events) {
+      return [];
+    }
+
+    return data.race.events.map((event: any) => ({
+      event_id: event.event_id,
+      name: event.name,
+      distance: event.distance || 'Unknown',
+      start_time: event.start_time,
+      isPast: new Date(event.start_time) < now
+    })).filter((event: RunSignupEvent) => event.isPast);
   }
 
   /**
    * Get results for a specific race and event
    */
-  async getResults(raceId: string, eventId?: string) {
+  async getResults(raceId: string, eventId?: string): Promise<any[]> {
     // If no eventId provided, get all events and find the one with most results
     if (!eventId) {
-      const events = await this.getRaceEvents(raceId);
-      console.log(`Found ${events.length} events for race ${raceId}:`, events.map(e => ({ id: e.event_id, name: e.name })));
-      
-      if (events.length === 0) {
-        return [];
-      }
-      
-      // Check each event to find the one with most participants
-      let bestEvent = null;
-      let maxResults = 0;
-      
-      for (const event of events) {
-        try {
-          console.log(`Checking event ${event.event_id} (${event.name})...`);
-          const eventResults = await this.getResults(raceId, event.event_id.toString());
-          console.log(`Event ${event.event_id} has ${eventResults.length} results`);
-          
-          if (eventResults.length > maxResults) {
-            maxResults = eventResults.length;
-            bestEvent = event.event_id.toString();
-          }
-        } catch (error) {
-          console.log(`Error checking event ${event.event_id}:`, error);
-        }
-      }
-      
-      console.log(`Best event: ${bestEvent} with ${maxResults} results`);
-      
-      if (bestEvent) {
-        return this.getResults(raceId, bestEvent);
-      }
-      return [];
+      throw new Error('Event ID is required. Use getRaceEvents() to get available events first.');
     }
 
     const params: Record<string, string> = {

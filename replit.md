@@ -41,6 +41,15 @@ Built with:
 
 ## Recent Changes
 
+### July 2, 2025 - Private Series & RunSignup Event Selection
+✓ Implemented private race series functionality with manual admin approval
+✓ Added race_series_participants table for controlled access to private series
+✓ Updated series leaderboard calculation to filter by approved participants
+✓ Enhanced RunSignup integration with proper event selection workflow
+✓ Added API endpoint to fetch available past events for a race
+✓ Updated import UI to require event selection for better data accuracy
+✓ Fixed RunSignup API to handle multiple events per race properly
+
 ### July 1, 2025 - Database Migration to PostgreSQL
 ✓ Migrated from in-memory storage to persistent PostgreSQL database
 ✓ Implemented complete DatabaseStorage class with Drizzle ORM

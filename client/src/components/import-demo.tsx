@@ -103,6 +103,14 @@ const EXAMPLE_RESULTS_DATA = [
   }
 ];
 
+interface RunSignupEvent {
+  event_id: number;
+  name: string;
+  distance: string;
+  start_time: string;
+  isPast: boolean;
+}
+
 export function ImportDemo() {
   const [importUrl, setImportUrl] = useState("");
   const [importType, setImportType] = useState<"url" | "csv" | "api">("url");
@@ -112,7 +120,42 @@ export function ImportDemo() {
   const [raceName, setRaceName] = useState("");
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [availableEvents, setAvailableEvents] = useState<RunSignupEvent[]>([]);
+  const [fetchingEvents, setFetchingEvents] = useState(false);
+  const [eventsError, setEventsError] = useState<string | null>(null);
   const queryClient = useQueryClient();
+
+  // Function to fetch available events for a race
+  const fetchEvents = async (raceIdValue: string) => {
+    if (!raceIdValue.trim()) {
+      setAvailableEvents([]);
+      return;
+    }
+
+    setFetchingEvents(true);
+    setEventsError(null);
+    setEventId("");
+
+    try {
+      const response = await fetch(`/api/runsignup/race/${raceIdValue.trim()}/events`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.details || data.error || 'Failed to fetch events');
+      }
+
+      setAvailableEvents(data);
+      if (data.length === 0) {
+        setEventsError('No past events found for this race');
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      setEventsError(error instanceof Error ? error.message : 'Failed to fetch events');
+      setAvailableEvents([]);
+    } finally {
+      setFetchingEvents(false);
+    }
+  };
 
   const importMutation = useMutation({
     mutationFn: async () => {
@@ -145,10 +188,14 @@ export function ImportDemo() {
           throw new Error('Please enter a Race ID');
         }
         
+        if (!eventId.trim()) {
+          throw new Error('Please select an event to import results from');
+        }
+        
         endpoint = '/api/import/runsignup-api';
         body = {
           raceId: raceId.trim(),
-          eventId: eventId.trim() || undefined,
+          eventId: eventId.trim(),
           raceName: raceName.trim() || undefined
         };
       } else {
@@ -328,31 +375,70 @@ export function ImportDemo() {
         {/* API Import */}
         {importType === "api" && (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Race ID <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={raceId}
-                  onChange={(e) => setRaceId(e.target.value)}
-                  placeholder="169856"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-performance-blue focus:border-performance-blue"
-                />
+            <div className="space-y-4">
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Race ID <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={raceId}
+                    onChange={(e) => {
+                      setRaceId(e.target.value);
+                      // Clear events when race ID changes
+                      if (e.target.value !== raceId) {
+                        setAvailableEvents([]);
+                        setEventId("");
+                        setEventsError(null);
+                      }
+                    }}
+                    placeholder="169856"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-performance-blue focus:border-performance-blue"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={() => fetchEvents(raceId)}
+                    disabled={!raceId.trim() || fetchingEvents}
+                    className="px-4 py-2 bg-performance-blue text-white rounded-lg hover:bg-performance-blue/90 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    {fetchingEvents ? "Loading..." : "Fetch Events"}
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Event ID (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={eventId}
-                  onChange={(e) => setEventId(e.target.value)}
-                  placeholder="890301"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-performance-blue focus:border-performance-blue"
-                />
-              </div>
+
+              {/* Events Error */}
+              {eventsError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700">{eventsError}</p>
+                </div>
+              )}
+
+              {/* Event Selection */}
+              {availableEvents.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Select Event <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={eventId}
+                    onChange={(e) => setEventId(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-performance-blue focus:border-performance-blue"
+                  >
+                    <option value="">Select an event...</option>
+                    {availableEvents.map((event) => (
+                      <option key={event.event_id} value={event.event_id}>
+                        {event.name} - {event.distance} ({new Date(event.start_time).toLocaleDateString()})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-600 mt-1">
+                    Only past events with results are shown
+                  </p>
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">

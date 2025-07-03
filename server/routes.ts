@@ -619,6 +619,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Race ID is required" });
       }
 
+      if (!eventId) {
+        return res.status(400).json({ 
+          error: "Event ID is required. Please use /api/runsignup/race/:raceId/events to get available events first." 
+        });
+      }
+
       // Check if we have API credentials
       const apiKey = process.env.RUNSIGNUP_API_KEY;
       const apiSecret = process.env.RUNSIGNUP_API_SECRET;
@@ -863,6 +869,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(history);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch runner series history" });
+    }
+  });
+
+  // RunSignup Race Events endpoint
+  app.get("/api/runsignup/race/:raceId/events", async (req, res) => {
+    try {
+      const raceId = req.params.raceId;
+      
+      if (!process.env.RUNSIGNUP_API_KEY || !process.env.RUNSIGNUP_API_SECRET) {
+        return res.status(400).json({ 
+          error: "RunSignup API credentials not configured" 
+        });
+      }
+
+      const provider = new (await import('./providers/runsignup')).RunSignupProvider(
+        process.env.RUNSIGNUP_API_KEY,
+        process.env.RUNSIGNUP_API_SECRET
+      );
+
+      const events = await provider.getRaceEvents(raceId);
+      res.json(events);
+    } catch (error) {
+      console.error('Error fetching race events:', error);
+      res.status(500).json({ 
+        error: "Failed to fetch race events",
+        details: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 
