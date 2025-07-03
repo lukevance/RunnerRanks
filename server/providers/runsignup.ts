@@ -30,29 +30,24 @@ export interface RunSignupEvent {
 }
 
 export interface RunSignupResult {
-  participant_id: number;
-  user?: {
-    first_name: string;
-    last_name: string;
-    email?: string;
-    gender: string;
-    dob?: string;
-  };
-  registration?: {
-    first_name: string;
-    last_name: string;
-    gender: string;
-    age: number;
-    city?: string;
-    state?: string;
-  };
-  results?: {
-    chip_time?: string;
-    gun_time?: string;
-    overall_place?: number;
-    gender_place?: number;
-    division_place?: number;
-  };
+  result_id?: number;
+  place?: number;
+  bib?: number;
+  first_name?: string;
+  last_name?: string;
+  gender?: string;
+  age?: number;
+  city?: string;
+  state?: string;
+  country_code?: string;
+  email?: string;
+  chip_time?: string;
+  clock_time?: string;
+  pace?: string;
+  gender_place?: number;
+  age_group_place?: number;
+  // Split times and other fields may be present
+  [key: string]: any;
 }
 
 export class RunSignupProvider {
@@ -236,26 +231,23 @@ export class RunSignupProvider {
   private transformResultsData(results: RunSignupResult[]) {
     return results.map((result, index) => {
       try {
-        // RunSignup can have user data or registration data
-        const userData = result.user;
-        const regData = result.registration;
-        
-        const firstName = userData?.first_name || regData?.first_name || '';
-        const lastName = userData?.last_name || regData?.last_name || '';
+        // RunSignup API returns results with fields directly in the result object
+        const firstName = result.first_name || '';
+        const lastName = result.last_name || '';
         
         return {
           name: `${firstName} ${lastName}`.trim(),
-          age: regData?.age,
-          gender: this.normalizeGender(userData?.gender || regData?.gender),
-          city: regData?.city,
-          state: regData?.state,
-          email: userData?.email,
-          finish_time: result.results?.chip_time || result.results?.gun_time || '0:00:00',
-          overall_place: result.results?.overall_place || 0,
-          gender_place: result.results?.gender_place || null,
-          age_group_place: result.results?.division_place || null,
+          age: result.age || undefined,
+          gender: this.normalizeGender(result.gender),
+          city: result.city || undefined,
+          state: result.state || undefined,
+          email: result.email || undefined,
+          finish_time: result.chip_time || result.clock_time || '0:00:00',
+          overall_place: result.place || 0,
+          gender_place: result.gender_place || null,
+          age_group_place: result.age_group_place || null,
           sourceProvider: 'runsignup',
-          sourceResultId: result.participant_id?.toString() || `unknown_${index}`
+          sourceResultId: result.result_id?.toString() || `unknown_${index}`
         };
       } catch (error) {
         console.error(`Error transforming result ${index}:`, error, 'Result:', JSON.stringify(result).substring(0, 200));
