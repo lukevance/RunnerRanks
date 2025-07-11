@@ -197,6 +197,48 @@ export class RunSignupProvider {
   }
 
   /**
+   * Get race information including event details for importing results
+   */
+  async getRaceInfo(raceId: string, eventId: string): Promise<any> {
+    // First get the race details
+    const raceUrl = this.createAuthenticatedUrl(`/race/${raceId}`);
+    const raceResponse = await fetch(raceUrl);
+    
+    if (!raceResponse.ok) {
+      throw new Error(`RunSignup API error: ${raceResponse.statusText}`);
+    }
+
+    const raceData = await raceResponse.json();
+    const race = raceData.race;
+    
+    // Find the specific event
+    const event = race.events?.find((e: any) => e.event_id.toString() === eventId.toString());
+    if (!event) {
+      throw new Error(`Event ${eventId} not found in race ${raceId}`);
+    }
+
+    return {
+      name: race.name,
+      date: event.start_time,
+      distance: this.normalizeDistance(event.distance),
+      distanceMiles: this.getDistanceMiles(event.distance),
+      city: race.address?.city || '',
+      state: race.address?.state || '',
+      startTime: event.start_time || '7:00 AM',
+      weather: null,
+      courseType: null,
+      elevation: null,
+      totalFinishers: 0,
+      averageTime: '0:00:00',
+      organizerWebsite: `https://runsignup.com/Race/${race.race_id}`,
+      resultsUrl: `https://runsignup.com/Race/${race.race_id}/Results`,
+      sourceProvider: 'runsignup',
+      sourceRaceId: race.race_id.toString(),
+      sourceEventId: eventId
+    };
+  }
+
+  /**
    * Transform RunSignup race data to our internal format
    */
   private transformRaceData(races: RunSignupRace[]) {
@@ -265,6 +307,12 @@ export class RunSignupProvider {
     if (d.includes('10k') || d.includes('10.0')) return '10k';
     if (d.includes('5k') || d.includes('5.0')) return '5k';
     
+    // Handle numeric distances
+    if (d.includes('26.2') || d.includes('42.2') || d.includes('42k')) return 'marathon';
+    if (d.includes('13.1') || d.includes('21.1') || d.includes('21k')) return 'half-marathon';
+    if (d.includes('6.2') || d.includes('10.')) return '10k';
+    if (d.includes('3.1') || d.includes('5.')) return '5k';
+    
     return distance;
   }
 
@@ -276,7 +324,15 @@ export class RunSignupProvider {
       case 'half-marathon': return '13.10';
       case '10k': return '6.21';
       case '5k': return '3.11';
-      default: return '0.00';
+      default: 
+        // Try to extract numeric distance if possible
+        if (distance) {
+          const match = distance.match(/(\d+\.?\d*)/);
+          if (match) {
+            return parseFloat(match[1]).toFixed(2);
+          }
+        }
+        return '0.00';
     }
   }
 

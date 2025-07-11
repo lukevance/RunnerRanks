@@ -639,14 +639,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const runSignupProvider = new RunSignupProvider(apiKey, apiSecret);
       
-      // Get race details first
-      const raceData = await runSignupProvider.getRace(raceId);
-      if (!raceData) {
-        return res.status(400).json({ error: `Race ${raceId} not found` });
-      }
+      // Get race info for the specific event
+      const raceData = await runSignupProvider.getRaceInfo(raceId, eventId);
       console.log(`Found race: ${raceData.name}`);
       
-      // Get results for the specific event or all events
+      // Get results for the specific event
       const resultsData = await runSignupProvider.getResults(raceId, eventId);
       console.log(`Found ${resultsData.length} results`);
 

@@ -49,6 +49,8 @@ Built with:
 ✓ Added API endpoint to fetch available past events for a race
 ✓ Updated import UI to require event selection for better data accuracy
 ✓ Fixed RunSignup API to handle multiple events per race properly
+✓ Fixed pace calculation by improving distance normalization and event-specific race data
+✓ Resolved "infinity" pace display by ensuring proper distance_miles values
 
 ### July 1, 2025 - Database Migration to PostgreSQL
 ✓ Migrated from in-memory storage to persistent PostgreSQL database
