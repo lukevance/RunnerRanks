@@ -38,6 +38,9 @@ export function LeaderboardTable({ filters }: LeaderboardTableProps) {
     switch (distance) {
       case "marathon": return "Marathon";
       case "half-marathon": return "Half Marathon";
+      case "10-mile": return "10 Mile";
+      case "10k": return "10K";
+      case "5k": return "5K";
       default: return distance;
     }
   };
@@ -91,9 +94,6 @@ export function LeaderboardTable({ filters }: LeaderboardTableProps) {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Time
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Pace
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Race
@@ -152,16 +152,8 @@ export function LeaderboardTable({ filters }: LeaderboardTableProps) {
                       <div className="text-lg font-bold text-slate-900">
                         {formatTime(entry.result.finishTime)}
                       </div>
-                      <div className={`text-sm ${note.className}`}>
-                        {note.text}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-lg font-bold text-slate-900">
-                        {pace}/mi
-                      </div>
-                      <div className={`text-sm ${performance.color}`}>
-                        {performance.level}
+                      <div className="text-sm text-slate-500">
+                        {pace}/mi pace
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

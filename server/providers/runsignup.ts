@@ -304,12 +304,14 @@ export class RunSignupProvider {
     const d = distance.toLowerCase();
     if (d.includes('marathon') && !d.includes('half')) return 'marathon';
     if (d.includes('half') || d.includes('13.1')) return 'half-marathon';
+    if (d.includes('10 mil') || d.includes('10-mil') || d.includes('10mile')) return '10-mile';
     if (d.includes('10k') || d.includes('10.0')) return '10k';
     if (d.includes('5k') || d.includes('5.0')) return '5k';
     
     // Handle numeric distances
     if (d.includes('26.2') || d.includes('42.2') || d.includes('42k')) return 'marathon';
     if (d.includes('13.1') || d.includes('21.1') || d.includes('21k')) return 'half-marathon';
+    if (d.includes('10.0') && d.includes('mil')) return '10-mile';
     if (d.includes('6.2') || d.includes('10.')) return '10k';
     if (d.includes('3.1') || d.includes('5.')) return '5k';
     
@@ -322,6 +324,7 @@ export class RunSignupProvider {
     switch (d) {
       case 'marathon': return '26.20';
       case 'half-marathon': return '13.10';
+      case '10-mile': return '10.00';
       case '10k': return '6.21';
       case '5k': return '3.11';
       default: 

@@ -51,6 +51,10 @@ Built with:
 ✓ Fixed RunSignup API to handle multiple events per race properly
 ✓ Fixed pace calculation by improving distance normalization and event-specific race data
 ✓ Resolved "infinity" pace display by ensuring proper distance_miles values
+✓ Added 10 Mile distance support with proper normalization and conversion
+✓ Redesigned home page with distance-specific leaderboards showing top 5/25 times
+✓ Combined pace and time columns for cleaner display
+✓ Created dedicated /leaderboard page for full results with filters
 
 ### July 1, 2025 - Database Migration to PostgreSQL
 ✓ Migrated from in-memory storage to persistent PostgreSQL database

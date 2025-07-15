@@ -32,8 +32,11 @@ export function FilterControls({ filters, onFiltersChange }: FilterControlsProps
             onChange={(e) => handleFilterChange('distance', e.target.value)}
           >
             <option value="All Distances">All Distances</option>
-            <option value="Marathon (26.2 mi)">Marathon (26.2 mi)</option>
-            <option value="Half Marathon (13.1 mi)">Half Marathon (13.1 mi)</option>
+            <option value="marathon">Marathon (26.2 mi)</option>
+            <option value="half-marathon">Half Marathon (13.1 mi)</option>
+            <option value="10-mile">10 Mile (10.0 mi)</option>
+            <option value="10k">10K (6.2 mi)</option>
+            <option value="5k">5K (3.1 mi)</option>
           </select>
         </div>
         
