@@ -177,12 +177,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getResultsByRace(raceId: number): Promise<(Result & { runner: Runner })[]> {
-    return await db
+    const queryResult = await db
       .select()
       .from(results)
       .innerJoin(runners, eq(results.runnerId, runners.id))
       .where(eq(results.raceId, raceId))
       .orderBy(asc(results.overallPlace));
+      
+    // Transform the nested structure to match the expected format
+    return queryResult.map((row: any) => ({
+      ...row.results,
+      runner: row.runners
+    }));
   }
 
   // Leaderboard queries
