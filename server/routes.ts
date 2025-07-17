@@ -66,9 +66,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Race endpoints
   app.get("/api/races", async (req, res) => {
     try {
-      const races = await storage.getAllRacesWithStats();
-      res.json(races);
+      const races = await storage.getAllRaces();
+      // Temporarily get participant counts separately for each race
+      const racesWithStats = await Promise.all(races.map(async (race) => {
+        try {
+          const raceResults = await storage.getResultsByRace(race.id);
+          return {
+            ...race,
+            participants: raceResults.length
+          };
+        } catch (err) {
+          return {
+            ...race,
+            participants: 0
+          };
+        }
+      }));
+      res.json(racesWithStats);
     } catch (error) {
+      console.error('Races API error:', error);
       res.status(500).json({ error: "Failed to fetch races" });
     }
   });

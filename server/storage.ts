@@ -142,7 +142,7 @@ export class DatabaseStorage implements IStorage {
         courseType: races.courseType,
         elevation: races.elevation,
         weather: races.weather,
-        notes: races.notes,
+
         participants: count(results.id).as('participants')
       })
       .from(races)
