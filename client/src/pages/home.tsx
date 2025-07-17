@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Trophy, Clock, Calendar, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import { Header } from "@/components/header";
+import { RacesListModal } from "@/components/races-list-modal";
 import { Link } from "wouter";
 
 interface LeaderboardEntry {
@@ -59,8 +60,7 @@ function DistanceLeaderboard({ distance, label, distanceMiles }: DistanceLeaderb
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 animate-pulse">
-        <div className="h-6 bg-slate-200 rounded w-1/3 mb-4"></div>
+      <div className="animate-pulse">
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="h-4 bg-slate-200 rounded"></div>
@@ -72,10 +72,7 @@ function DistanceLeaderboard({ distance, label, distanceMiles }: DistanceLeaderb
 
   if (entries.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-slate-900">{label}</h3>
-        </div>
+      <div className="text-center py-8">
         <p className="text-slate-500 text-sm">No results available for this distance.</p>
       </div>
     );
@@ -93,10 +90,9 @@ function DistanceLeaderboard({ distance, label, distanceMiles }: DistanceLeaderb
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+    <div>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-slate-900">{label}</h3>
-        <Link href={`/leaderboard?distance=${encodeURIComponent(distance)}`} className="text-performance-blue hover:text-blue-700 text-sm flex items-center">
+        <Link href={`/leaderboard?distance=${encodeURIComponent(distance)}`} className="text-performance-blue hover:text-blue-700 text-sm flex items-center ml-auto">
           View all <ExternalLink className="w-3 h-3 ml-1" />
         </Link>
       </div>
@@ -150,6 +146,9 @@ function DistanceLeaderboard({ distance, label, distanceMiles }: DistanceLeaderb
 }
 
 export default function Home() {
+  const [selectedDistance, setSelectedDistance] = useState('marathon');
+  const [showRacesModal, setShowRacesModal] = useState(false);
+
   // Get overall stats
   const { data: stats } = useQuery({
     queryKey: ['/api/leaderboard', { limit: 1000 }], 
@@ -166,6 +165,8 @@ export default function Home() {
   // Count unique races
   const uniqueRaces = stats ? new Set(stats.map((entry: any) => entry.race.id)).size : 0;
 
+  const selectedDistanceData = DISTANCES.find(d => d.key === selectedDistance) || DISTANCES[0];
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Header />
@@ -179,16 +180,33 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Distance Leaderboards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {DISTANCES.map((dist) => (
+        {/* Distance Tabs */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-8">
+          <div className="border-b border-slate-200">
+            <nav className="flex space-x-8 px-6" aria-label="Distance tabs">
+              {DISTANCES.map((distance) => (
+                <button
+                  key={distance.key}
+                  onClick={() => setSelectedDistance(distance.key)}
+                  className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                    selectedDistance === distance.key
+                      ? 'border-performance-blue text-performance-blue'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  {distance.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+          
+          <div className="p-6">
             <DistanceLeaderboard
-              key={dist.key}
-              distance={dist.key}
-              label={dist.label}
-              distanceMiles={dist.distance}
+              distance={selectedDistanceData.key}
+              label={selectedDistanceData.label}
+              distanceMiles={selectedDistanceData.distance}
             />
-          ))}
+          </div>
         </div>
 
         {/* Quick Stats */}
@@ -221,7 +239,10 @@ export default function Home() {
             </div>
           </div>
           
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div 
+            className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setShowRacesModal(true)}
+          >
             <div className="flex items-center">
               <div className="w-12 h-12 bg-amber-500/10 rounded-lg flex items-center justify-center">
                 <Calendar className="text-amber-500 w-6 h-6" />
@@ -231,11 +252,18 @@ export default function Home() {
                   {uniqueRaces}
                 </div>
                 <div className="text-sm text-slate-600">Races This Year</div>
+                <div className="text-xs text-performance-blue mt-1">Click to view all</div>
               </div>
             </div>
           </div>
         </div>
       </main>
+
+      {/* Races List Modal */}
+      <RacesListModal
+        isOpen={showRacesModal}
+        onClose={() => setShowRacesModal(false)}
+      />
     </div>
   );
 }

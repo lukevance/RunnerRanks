@@ -40,6 +40,7 @@ export interface IStorage {
   getRace(id: number): Promise<Race | undefined>;
   createRace(race: InsertRace): Promise<Race>;
   getAllRaces(): Promise<Race[]>;
+  getAllRacesWithStats(): Promise<(Race & { participants: number })[]>;
   
   // Results
   getResult(id: number): Promise<Result | undefined>;
@@ -126,6 +127,33 @@ export class DatabaseStorage implements IStorage {
 
   async getAllRaces(): Promise<Race[]> {
     return await db.select().from(races).orderBy(desc(races.date));
+  }
+
+  async getAllRacesWithStats(): Promise<(Race & { participants: number })[]> {
+    const racesWithCounts = await db
+      .select({
+        id: races.id,
+        name: races.name,
+        date: races.date,
+        city: races.city,
+        state: races.state,
+        distance: races.distance,
+        distanceMiles: races.distanceMiles,
+        courseType: races.courseType,
+        elevation: races.elevation,
+        weather: races.weather,
+        notes: races.notes,
+        participants: count(results.id).as('participants')
+      })
+      .from(races)
+      .leftJoin(results, eq(races.id, results.raceId))
+      .groupBy(races.id)
+      .orderBy(desc(races.date));
+    
+    return racesWithCounts.map(race => ({
+      ...race,
+      participants: Number(race.participants)
+    }));
   }
 
   // Results

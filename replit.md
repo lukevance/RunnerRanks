@@ -55,6 +55,9 @@ Built with:
 ✓ Redesigned home page with distance-specific leaderboards showing top 5/25 times
 ✓ Combined pace and time columns for cleaner display
 ✓ Created dedicated /leaderboard page for full results with filters
+✓ Implemented tab controls for distance selection on homepage to reduce visual clutter
+✓ Added interactive race count indicator with modal showing all races and participant stats
+✓ Enhanced races API endpoint to include participant counts for better race information
 
 ### July 1, 2025 - Database Migration to PostgreSQL
 ✓ Migrated from in-memory storage to persistent PostgreSQL database

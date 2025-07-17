@@ -66,7 +66,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Race endpoints
   app.get("/api/races", async (req, res) => {
     try {
-      const races = await storage.getAllRaces();
+      const races = await storage.getAllRacesWithStats();
       res.json(races);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch races" });
