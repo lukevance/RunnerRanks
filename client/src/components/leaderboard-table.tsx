@@ -157,15 +157,13 @@ export function LeaderboardTable({ filters }: LeaderboardTableProps) {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div 
-                        className="text-sm font-medium text-slate-900 hover:text-performance-blue cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedRaceId(entry.race.id);
-                        }}
+                      <Link 
+                        href={`/race/${entry.race.id}/results`}
+                        className="text-sm font-medium text-slate-900 hover:text-performance-blue transition-colors block"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         {entry.race.name}
-                      </div>
+                      </Link>
                       <div className="text-sm text-slate-500 flex items-center space-x-2">
                         <span>{entry.race.distanceMiles} mi</span>
                         {entry.race.weather && (

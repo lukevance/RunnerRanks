@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertRunnerSchema, insertRaceSchema, insertResultSchema, insertRaceSeriesSchema } from "@shared/schema";
 import { runnerMatcher, type RawRunnerData } from "./runner-matching";
 import { RunSignupProvider } from "./providers/runsignup";
+import { RaceRosterProvider } from "./providers/raceroster";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -101,6 +102,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(race);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch race" });
+    }
+  });
+
+  app.get("/api/races/:id/results", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const results = await storage.getResultsByRace(id);
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch race results" });
     }
   });
 
@@ -751,19 +762,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/import/raceroster", async (req, res) => {
     try {
-      const { url } = req.body;
+      const { url, eventId, subEventId, raceName } = req.body;
       
-      if (!url) {
-        return res.status(400).json({ error: "RaceRoster URL is required" });
+      // Support both URL parsing and direct event IDs
+      let finalEventId = eventId;
+      let finalSubEventId = subEventId;
+      
+      if (url && !eventId) {
+        const raceRosterProvider = new RaceRosterProvider();
+        const parsed = raceRosterProvider.parseRaceRosterUrl(url);
+        if (!parsed) {
+          return res.status(400).json({ error: "Invalid RaceRoster URL format" });
+        }
+        finalEventId = parsed.eventId;
+        finalSubEventId = parsed.subEventId;
+      }
+      
+      if (!finalEventId || !finalSubEventId) {
+        return res.status(400).json({ error: "Event ID and Sub-Event ID are required" });
       }
 
-      // For now, return a helpful error since we need API keys
-      res.status(400).json({ 
-        error: "RaceRoster integration requires API credentials. Please use CSV import or contact admin to set up RaceRoster API access." 
+      console.log(`Starting RaceRoster import for event ${finalEventId}, sub-event ${finalSubEventId}`);
+
+      const raceRosterProvider = new RaceRosterProvider();
+      const data = await raceRosterProvider.getResults(finalEventId, finalSubEventId);
+      
+      console.log(`Found ${data.results.length} results from RaceRoster`);
+
+      if (data.results.length === 0) {
+        return res.status(400).json({ error: "No results found for this RaceRoster event" });
+      }
+
+      // Extract race information
+      const raceInfo = data.event_info || {};
+      const defaultRaceName = raceName || raceInfo.name || `RaceRoster Event ${finalEventId}`;
+      const raceDate = raceInfo.date || new Date().toISOString().split('T')[0];
+      const distance = raceInfo.distance || 'marathon';
+      
+      // Normalize distance
+      const normalizedDistance = distance.toLowerCase().includes('marathon') && !distance.toLowerCase().includes('half') 
+        ? 'marathon' 
+        : distance.toLowerCase().includes('half') 
+        ? 'half-marathon'
+        : distance.toLowerCase().includes('10k')
+        ? '10k'
+        : distance.toLowerCase().includes('5k')
+        ? '5k'
+        : distance.toLowerCase().includes('10') && distance.toLowerCase().includes('mile')
+        ? '10-mile'
+        : 'other';
+
+      const distanceMiles = normalizedDistance === 'marathon' ? '26.2' 
+        : normalizedDistance === 'half-marathon' ? '13.1'
+        : normalizedDistance === '10k' ? '6.2'
+        : normalizedDistance === '5k' ? '3.1'
+        : normalizedDistance === '10-mile' ? '10.0'
+        : '0';
+
+      // Create race record
+      const race = await storage.createRace({
+        name: defaultRaceName,
+        date: raceDate,
+        distance: normalizedDistance,
+        distanceMiles: distanceMiles,
+        city: raceInfo.city || "TBD",
+        state: raceInfo.state || "TBD",
+        startTime: raceInfo.start_time || "08:00:00",
+        totalFinishers: data.results.length,
+        averageTime: "00:00:00"
+      });
+
+      console.log(`Created race record with ID ${race.id}`);
+
+      // Import results with runner matching
+      const importResults = {
+        totalResults: data.results.length,
+        imported: 0,
+        matched: 0,
+        newRunners: 0,
+        needsReview: 0,
+        errors: [] as string[]
+      };
+
+      for (const result of data.results) {
+        try {
+          // Extract runner information
+          const runnerName = result.name || `${result.first_name || ''} ${result.last_name || ''}`.trim();
+          const finishTime = result.finish_time || result.time || '';
+          
+          if (!runnerName || !finishTime) {
+            importResults.errors.push(`Skipping result with missing name or time`);
+            continue;
+          }
+
+          const rawRunnerData: RawRunnerData = {
+            name: runnerName,
+            age: result.age || 0,
+            gender: result.gender || 'U',
+            city: result.city || '',
+            state: result.state || '',
+            finishTime: finishTime
+          };
+
+          const { runner, matchScore, needsReview } = await runnerMatcher.matchRunner(rawRunnerData, race.id.toString(), storage);
+          
+          await storage.createResult({
+            runnerId: runner.id,
+            raceId: race.id,
+            finishTime: finishTime,
+            overallPlace: result.overall_place || result.place || 0,
+            genderPlace: result.gender_place || null,
+            ageGroupPlace: result.age_group_place || null,
+            sourceProvider: "raceroster",
+            rawRunnerName: rawRunnerData.name,
+            matchingScore: matchScore,
+            needsReview: needsReview
+          });
+
+          importResults.imported++;
+          if (matchScore >= 95) {
+            importResults.matched++;
+          } else if (matchScore === 0) {
+            importResults.newRunners++;
+          } else if (needsReview) {
+            importResults.needsReview++;
+          }
+
+        } catch (error) {
+          console.error("Error processing RaceRoster result:", error);
+          importResults.errors.push(`Failed to process result for ${result.name || 'unknown'}`);
+        }
+      }
+
+      console.log(`RaceRoster import complete: ${importResults.imported} results imported`);
+
+      res.json({
+        success: true,
+        race: race,
+        importResults
       });
 
     } catch (error) {
-      res.status(500).json({ error: "Failed to import from RaceRoster" });
+      console.error("RaceRoster import error:", error);
+      res.status(500).json({ error: "Failed to import from RaceRoster: " + (error as Error).message });
     }
   });
 

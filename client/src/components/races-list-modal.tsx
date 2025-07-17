@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Calendar, MapPin, Users, Clock } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { Link } from "wouter";
 
 interface Race {
   id: number;
@@ -66,13 +67,14 @@ export function RacesListModal({ isOpen, onClose }: RacesListModalProps) {
         ) : (
           <div className="space-y-3">
             {sortedRaces.map((race) => (
-              <div
+              <Link
                 key={race.id}
-                className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                href={`/race/${race.id}/results`}
+                className="block p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900 mb-2">
+                    <h3 className="font-semibold text-slate-900 mb-2 hover:text-performance-blue">
                       {race.name}
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-slate-600">
@@ -97,7 +99,7 @@ export function RacesListModal({ isOpen, onClose }: RacesListModalProps) {
                     </div>
                   )}
                 </div>
-              </div>
+              </Link>
             ))}
             {races.length === 0 && (
               <div className="text-center py-8 text-slate-500">
