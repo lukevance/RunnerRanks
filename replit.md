@@ -41,16 +41,15 @@ Built with:
 
 ## Recent Changes
 
-### July 17, 2025 - Single Race Results View & Enhanced Import Pagination
-✓ Added navigation links from races modal to individual race results pages
-✓ Updated leaderboard table with clickable race names leading to race results
-✓ Implemented comprehensive RaceRoster import integration with API provider
-✓ Added RaceRoster URL support to import component alongside RunSignup
-✓ Enhanced race results page with detailed race information and participant listings
-✓ Fixed race results API data structure issue - resolved "Cannot read properties of undefined" error
-✓ Implemented robust pagination for RunSignup imports to ensure all race results are captured
-✓ Updated both URL import and API import methods with proper pagination (100 results per page)
-✓ Enhanced pagination logic to handle varying result set sizes and prevent data truncation
+### July 18, 2025 - Runner Review System & Race Series Management Fixes
+✓ Fixed race series management error - added missing `addedAt` field to resolve 500 errors when adding races
+✓ Implemented comprehensive runner review system with API endpoints for manual verification
+✓ Created /runner-review page with tabbed interface for pending results and runner matches
+✓ Added runner review tab to admin dashboard with direct navigation link
+✓ Implemented approve/reject functionality for runner matches requiring manual verification
+✓ Enhanced pagination attempts for RunSignup imports (pagination logic improved but still investigating API limits)
+✓ Added remove race functionality to series management (already existed in UI with proper API endpoints)
+✓ All race series operations now working correctly including add/remove races from series
 
 ### July 2, 2025 - Private Series & RunSignup Event Selection
 ✓ Implemented private race series functionality with manual admin approval

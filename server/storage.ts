@@ -365,7 +365,8 @@ export class DatabaseStorage implements IStorage {
       seriesId,
       raceId,
       seriesRaceNumber: options?.seriesRaceNumber || 1,
-      pointsMultiplier: options?.pointsMultiplier || '1.0'
+      pointsMultiplier: options?.pointsMultiplier || '1.00',
+      addedAt: new Date().toISOString()
     }).returning();
     return seriesRace;
   }
