@@ -161,7 +161,7 @@ export class RunSignupProvider {
   }
 
   /**
-   * Get results for a specific race and event
+   * Get results for a specific race and event with pagination support
    */
   async getResults(raceId: string, eventId?: string): Promise<any[]> {
     // If no eventId provided, get all events and find the one with most results
@@ -169,31 +169,60 @@ export class RunSignupProvider {
       throw new Error('Event ID is required. Use getRaceEvents() to get available events first.');
     }
 
-    const params: Record<string, string> = {
-      event_id: eventId
-    };
+    console.log(`Fetching results for race ${raceId}, event ${eventId} with pagination...`);
+    
+    let allResults: any[] = [];
+    let page = 1;
+    const pageSize = 100;
+    let hasMoreResults = true;
+    
+    while (hasMoreResults) {
+      const params: Record<string, string> = {
+        event_id: eventId,
+        page: page.toString(),
+        num: pageSize.toString()
+      };
 
-    const url = this.createAuthenticatedUrl(`/race/${raceId}/results/get-results`, params);
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`RunSignup API error: ${response.statusText}`);
-    }
+      const url = this.createAuthenticatedUrl(`/race/${raceId}/results/get-results`, params);
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`RunSignup API error: ${response.statusText}`);
+      }
 
-    const data = await response.json();
-    console.log(`RunSignup API response for event ${eventId}:`, JSON.stringify(data).substring(0, 500));
-    
-    // Handle different response structures
-    let results = [];
-    if (data.individual_results_sets && data.individual_results_sets.length > 0) {
-      results = data.individual_results_sets[0].results || [];
-    } else if (data.results) {
-      results = data.results;
+      const data = await response.json();
+      
+      // Handle different response structures
+      let pageResults = [];
+      if (data.individual_results_sets && data.individual_results_sets.length > 0) {
+        pageResults = data.individual_results_sets[0].results || [];
+      } else if (data.results) {
+        pageResults = data.results;
+      }
+      
+      allResults.push(...pageResults);
+      console.log(`Page ${page}: Found ${pageResults.length} results for event ${eventId}`);
+      
+      // Check if we have more results to fetch
+      hasMoreResults = pageResults.length === pageSize;
+      
+      // If we got fewer results than the page size, we've reached the end
+      if (pageResults.length < pageSize) {
+        hasMoreResults = false;
+      }
+      
+      page++;
+      
+      // Safety check to prevent infinite loops
+      if (page > 100) {
+        console.log(`Stopping pagination at page ${page} for safety`);
+        break;
+      }
     }
     
-    console.log(`Found ${results.length} raw results, first result:`, results[0] ? JSON.stringify(results[0]).substring(0, 300) : 'none');
+    console.log(`Total found via pagination: ${allResults.length} results for event ${eventId} across ${page - 1} pages`);
     
-    return this.transformResultsData(results);
+    return this.transformResultsData(allResults);
   }
 
   /**

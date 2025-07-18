@@ -486,41 +486,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log(`Found ${allResults.length} total results for ${bestEvent.distance} (event ${bestEvent.eventId}) without pagination`);
             }
             
-            // If we got fewer than expected results, try pagination
-            if (allResults.length === 50 || allResults.length === 100) {
-              console.log(`Trying pagination to get more results...`);
-              allResults = [];
-              let page = 1;
-              const pageSize = 100;
-              let hasMoreResults = true;
+            // Always try pagination to ensure we get all results
+            // RunSignup often limits initial responses, so we need to paginate through all results
+            console.log(`Attempting pagination to ensure we get all results...`);
+            allResults = [];
+            let page = 1;
+            const pageSize = 100;
+            let hasMoreResults = true;
+            
+            while (hasMoreResults) {
+              apiUrl = `https://runsignup.com/Rest/race/${raceId}/results/get-results?event_id=${bestEvent.eventId}&format=json&page=${page}&num=${pageSize}`;
+              apiResponse = await fetch(apiUrl);
+              apiData = await apiResponse.json();
               
-              while (hasMoreResults) {
-                apiUrl = `https://runsignup.com/Rest/race/${raceId}/results/get-results?event_id=${bestEvent.eventId}&format=json&page=${page}&num=${pageSize}`;
-                apiResponse = await fetch(apiUrl);
-                apiData = await apiResponse.json();
+              if (apiData.individual_results_sets && apiData.individual_results_sets.length > 0) {
+                const pageResults = apiData.individual_results_sets[0].results || [];
+                allResults.push(...pageResults);
                 
-                if (apiData.individual_results_sets && apiData.individual_results_sets.length > 0) {
-                  const pageResults = apiData.individual_results_sets[0].results || [];
-                  allResults.push(...pageResults);
-                  
-                  // Check if we have more results to fetch
-                  hasMoreResults = pageResults.length === pageSize;
-                  page++;
-                  
-                  console.log(`Page ${page - 1}: Found ${pageResults.length} results for ${bestEvent.distance} (event ${bestEvent.eventId})`);
-                } else {
+                // Check if we have more results to fetch
+                hasMoreResults = pageResults.length === pageSize;
+                
+                console.log(`Page ${page}: Found ${pageResults.length} results for ${bestEvent.distance} (event ${bestEvent.eventId})`);
+                
+                // If we got fewer results than the page size, we've reached the end
+                if (pageResults.length < pageSize) {
                   hasMoreResults = false;
                 }
                 
-                // Safety check to prevent infinite loops
-                if (page > 50) {
-                  console.log(`Stopping pagination at page ${page} for safety`);
-                  break;
-                }
+                page++;
+              } else {
+                hasMoreResults = false;
               }
               
-              console.log(`Total found via pagination: ${allResults.length} results for ${bestEvent.distance} (event ${bestEvent.eventId}) across ${page - 1} pages`);
+              // Safety check to prevent infinite loops
+              if (page > 100) {
+                console.log(`Stopping pagination at page ${page} for safety`);
+                break;
+              }
             }
+            
+            console.log(`Total found via pagination: ${allResults.length} results for ${bestEvent.distance} (event ${bestEvent.eventId}) across ${page - 1} pages`);
             
             if (allResults.length > 0) {
               resultsData = allResults;
