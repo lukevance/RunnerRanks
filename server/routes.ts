@@ -503,9 +503,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const pageResults = apiData.individual_results_sets[0].results || [];
                 allResults.push(...pageResults);
                 
-                // Check if we have more results to fetch
-                hasMoreResults = pageResults.length === pageSize;
-                
                 console.log(`Page ${page}: Found ${pageResults.length} results for ${bestEvent.distance} (event ${bestEvent.eventId})`);
                 
                 // If we got fewer results than the page size, we've reached the end
@@ -910,6 +907,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("RaceRoster import error:", error);
       res.status(500).json({ error: "Failed to import from RaceRoster: " + (error as Error).message });
+    }
+  });
+
+  // Runner Review endpoints
+  app.get("/api/runner-reviews", async (req, res) => {
+    try {
+      const pendingReviews = await storage.getPendingRunnerReviews();
+      res.json(pendingReviews);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch pending runner reviews" });
+    }
+  });
+
+  app.get("/api/runner-matches", async (req, res) => {
+    try {
+      const { status } = req.query;
+      const matches = await storage.getRunnerMatchesByStatus(status as string || 'pending');
+      res.json(matches);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch runner matches" });
+    }
+  });
+
+  app.patch("/api/runner-matches/:id/approve", async (req, res) => {
+    try {
+      const matchId = parseInt(req.params.id);
+      const { reviewedBy } = req.body;
+      
+      const success = await storage.approveRunnerMatch(matchId, reviewedBy || 'admin');
+      
+      if (success) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: "Runner match not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to approve runner match" });
+    }
+  });
+
+  app.patch("/api/runner-matches/:id/reject", async (req, res) => {
+    try {
+      const matchId = parseInt(req.params.id);
+      const { reviewedBy } = req.body;
+      
+      const success = await storage.rejectRunnerMatch(matchId, reviewedBy || 'admin');
+      
+      if (success) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: "Runner match not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to reject runner match" });
     }
   });
 

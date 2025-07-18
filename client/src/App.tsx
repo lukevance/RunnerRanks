@@ -9,6 +9,7 @@ import RunnerProfile from "@/pages/runner-profile";
 import RaceDetails from "@/pages/race-details";
 import RaceResults from "@/pages/race-results";
 import Admin from "@/pages/admin";
+import RunnerReview from "@/pages/runner-review";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/race/:id" component={RaceDetails} />
       <Route path="/race/:id/results" component={RaceResults} />
       <Route path="/admin" component={Admin} />
+      <Route path="/runner-review" component={RunnerReview} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -203,9 +203,6 @@ export class RunSignupProvider {
       allResults.push(...pageResults);
       console.log(`Page ${page}: Found ${pageResults.length} results for event ${eventId}`);
       
-      // Check if we have more results to fetch
-      hasMoreResults = pageResults.length === pageSize;
-      
       // If we got fewer results than the page size, we've reached the end
       if (pageResults.length < pageSize) {
         hasMoreResults = false;

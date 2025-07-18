@@ -86,6 +86,13 @@ export interface IStorage {
   // Runner Matching
   createRunnerMatch(match: InsertRunnerMatch): Promise<RunnerMatch>;
   
+  // Runner Review
+  getPendingRunnerReviews(): Promise<(Result & { runner: Runner; race: Race })[]>;
+  getRunnerMatchesByStatus(status: string): Promise<RunnerMatch[]>;
+  updateRunnerMatchStatus(id: number, status: string, reviewedBy?: string): Promise<RunnerMatch | undefined>;
+  approveRunnerMatch(matchId: number, reviewedBy: string): Promise<boolean>;
+  rejectRunnerMatch(matchId: number, reviewedBy: string): Promise<boolean>;
+  
   // Private Series Participants
   addRunnerToPrivateSeries(seriesId: number, runnerId: number, addedBy: string, notes?: string): Promise<RaceSeriesParticipant>;
   removeRunnerFromPrivateSeries(seriesId: number, runnerId: number): Promise<boolean>;
@@ -511,6 +518,55 @@ export class DatabaseStorage implements IStorage {
   async createRunnerMatch(insertMatch: InsertRunnerMatch): Promise<RunnerMatch> {
     const [match] = await db.insert(runnerMatches).values(insertMatch).returning();
     return match;
+  }
+
+  // Runner Review
+  async getPendingRunnerReviews(): Promise<(Result & { runner: Runner; race: Race })[]> {
+    const reviewResults = await db
+      .select()
+      .from(results)
+      .innerJoin(runners, eq(results.runnerId, runners.id))
+      .innerJoin(races, eq(results.raceId, races.id))
+      .where(eq(results.needsReview, true))
+      .orderBy(desc(results.importedAt));
+    
+    return reviewResults.map(r => ({
+      ...r.results,
+      runner: r.runners,
+      race: r.races
+    }));
+  }
+
+  async getRunnerMatchesByStatus(status: string): Promise<RunnerMatch[]> {
+    return await db
+      .select()
+      .from(runnerMatches)
+      .where(eq(runnerMatches.status, status))
+      .orderBy(desc(runnerMatches.createdAt));
+  }
+
+  async updateRunnerMatchStatus(id: number, status: string, reviewedBy?: string): Promise<RunnerMatch | undefined> {
+    const [updated] = await db
+      .update(runnerMatches)
+      .set({
+        status,
+        reviewedBy: reviewedBy || null,
+        reviewedAt: new Date().toISOString()
+      })
+      .where(eq(runnerMatches.id, id))
+      .returning();
+    
+    return updated || undefined;
+  }
+
+  async approveRunnerMatch(matchId: number, reviewedBy: string): Promise<boolean> {
+    const updated = await this.updateRunnerMatchStatus(matchId, 'approved', reviewedBy);
+    return !!updated;
+  }
+
+  async rejectRunnerMatch(matchId: number, reviewedBy: string): Promise<boolean> {
+    const updated = await this.updateRunnerMatchStatus(matchId, 'rejected', reviewedBy);
+    return !!updated;
   }
 
   // Private Series Participants
@@ -1253,6 +1309,27 @@ export class MemStorage implements IStorage {
 
   async isRunnerInPrivateSeries(seriesId: number, runnerId: number): Promise<boolean> {
     return false; // Stub implementation - MemStorage doesn't support private series
+  }
+
+  // Runner Review (stub methods for MemStorage)
+  async getPendingRunnerReviews(): Promise<(Result & { runner: Runner; race: Race })[]> {
+    return []; // Stub implementation - MemStorage doesn't support runner review
+  }
+
+  async getRunnerMatchesByStatus(status: string): Promise<RunnerMatch[]> {
+    return []; // Stub implementation - MemStorage doesn't support runner matches
+  }
+
+  async updateRunnerMatchStatus(id: number, status: string, reviewedBy?: string): Promise<RunnerMatch | undefined> {
+    return undefined; // Stub implementation - MemStorage doesn't support runner matches
+  }
+
+  async approveRunnerMatch(matchId: number, reviewedBy: string): Promise<boolean> {
+    return false; // Stub implementation - MemStorage doesn't support runner matches
+  }
+
+  async rejectRunnerMatch(matchId: number, reviewedBy: string): Promise<boolean> {
+    return false; // Stub implementation - MemStorage doesn't support runner matches
   }
 
   private timeToSeconds(timeStr: string): number {
