@@ -275,6 +275,11 @@ export class RunSignupProvider {
           consecutiveEmptyPages++;
         } else {
           consecutiveEmptyPages = 0; // Reset counter when we find results
+          // Debug first result to understand structure
+          if (page === 1 && pageResults.length > 0) {
+            console.log(`[RunSignup] First result structure:`, Object.keys(pageResults[0]));
+            console.log(`[RunSignup] First result sample:`, JSON.stringify(pageResults[0]).substring(0, 200));
+          }
         }
       }
       
@@ -400,19 +405,38 @@ export class RunSignupProvider {
   private transformResultsData(results: RunSignupResult[]) {
     return results.map((result, index) => {
       try {
-        // RunSignup API returns results with fields directly in the result object
-        const firstName = result.first_name || '';
-        const lastName = result.last_name || '';
+        // Debug the actual field structure for the first few results
+        if (this.isDevMode && index < 3) {
+          console.log(`[RunSignup] Result ${index} available fields:`, Object.keys(result));
+          console.log(`[RunSignup] Result ${index} sample data:`, JSON.stringify(result).substring(0, 300));
+        }
+        
+        // Try different possible field names based on RunSignup API variations
+        const firstName = result.first_name || result.firstName || result.user?.first_name || '';
+        const lastName = result.last_name || result.lastName || result.user?.last_name || '';
+        const fullName = result.name || result.user?.name || `${firstName} ${lastName}`.trim();
+        
+        // Handle different time field variations
+        const finishTime = result.finish_time || result.chip_time || result.clock_time || 
+                          result.time || result.result_time || '0:00:00';
+        
+        // Handle different place field variations
+        const overallPlace = result.place || result.overall_place || result.position || 0;
         
         return {
-          name: `${firstName} ${lastName}`.trim(),
-          age: result.age || undefined,
-          gender: this.normalizeGender(result.gender),
-          city: result.city || undefined,
-          state: result.state || undefined,
-          email: result.email || undefined,
-          finish_time: result.chip_time || result.clock_time || '0:00:00',
-          overall_place: result.place || 0,
+          name: fullName || `${firstName} ${lastName}`.trim(),
+          first_name: firstName,
+          last_name: lastName,
+          age: result.age || result.user?.age || undefined,
+          gender: this.normalizeGender(result.gender || result.user?.gender),
+          city: result.city || result.user?.city || undefined,
+          state: result.state || result.user?.state || undefined,
+          email: result.email || result.user?.email || undefined,
+          finish_time: finishTime,
+          chip_time: result.chip_time || finishTime,
+          gun_time: result.gun_time || result.clock_time || finishTime,
+          overall_place: overallPlace,
+          place: overallPlace,
           gender_place: result.gender_place || null,
           age_group_place: result.age_group_place || null,
           sourceProvider: 'runsignup',
