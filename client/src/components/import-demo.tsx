@@ -124,6 +124,8 @@ export function ImportDemo() {
   const [availableEvents, setAvailableEvents] = useState<RunSignupEvent[]>([]);
   const [fetchingEvents, setFetchingEvents] = useState(false);
   const [eventsError, setEventsError] = useState<string | null>(null);
+  const [importId, setImportId] = useState<string | null>(null);
+  const [showProgress, setShowProgress] = useState(false);
   const queryClient = useQueryClient();
 
   // Function to fetch available events for a race
