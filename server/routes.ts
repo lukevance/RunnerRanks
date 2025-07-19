@@ -970,7 +970,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const series = await storage.getAllRaceSeries();
       res.json(series);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch race series" });
+      console.error("Error fetching race series:", error);
+      res.status(500).json({ error: "Failed to fetch race series", details: error.message });
     }
   });
 

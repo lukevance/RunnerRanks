@@ -323,19 +323,35 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllRaceSeries(): Promise<RaceSeriesWithRaces[]> {
-    const allSeries = await db.select().from(raceSeries).orderBy(desc(raceSeries.year));
-    
-    return await Promise.all(allSeries.map(async (series) => {
-      const seriesRaces = await this.getSeriesRaces(series.id);
-      const participantCount = await this.getSeriesParticipantCount(series.id);
+    try {
+      const allSeries = await db.select().from(raceSeries).orderBy(desc(raceSeries.year));
       
-      return {
-        ...series,
-        races: seriesRaces,
-        totalRaces: seriesRaces.length,
-        participantCount
-      };
-    }));
+      return await Promise.all(allSeries.map(async (series) => {
+        try {
+          const seriesRaces = await this.getSeriesRaces(series.id);
+          const participantCount = await this.getSeriesParticipantCount(series.id);
+          
+          return {
+            ...series,
+            races: seriesRaces,
+            totalRaces: seriesRaces.length,
+            participantCount
+          };
+        } catch (seriesError) {
+          console.error(`Error processing series ${series.id}:`, seriesError);
+          // Return series with empty races if there's an error getting associated data
+          return {
+            ...series,
+            races: [],
+            totalRaces: 0,
+            participantCount: 0
+          };
+        }
+      }));
+    } catch (error) {
+      console.error("Error in getAllRaceSeries:", error);
+      throw error;
+    }
   }
 
   async updateRaceSeries(id: number, updates: Partial<InsertRaceSeries>): Promise<RaceSeries | undefined> {
@@ -382,12 +398,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSeriesRaces(seriesId: number): Promise<(RaceSeriesRace & { race: Race })[]> {
-    return await db
-      .select()
-      .from(raceSeriesRaces)
-      .innerJoin(races, eq(raceSeriesRaces.raceId, races.id))
-      .where(eq(raceSeriesRaces.seriesId, seriesId))
-      .orderBy(asc(raceSeriesRaces.seriesRaceNumber));
+    try {
+
+      const result = await db
+        .select({
+          // Select all race_series_races fields
+          id: raceSeriesRaces.id,
+          seriesId: raceSeriesRaces.seriesId,
+          raceId: raceSeriesRaces.raceId,
+          seriesRaceNumber: raceSeriesRaces.seriesRaceNumber,
+          pointsMultiplier: raceSeriesRaces.pointsMultiplier,
+          isCountedInSeries: raceSeriesRaces.isCountedInSeries,
+          addedAt: raceSeriesRaces.addedAt,
+          // Select race as nested object
+          race: races
+        })
+        .from(raceSeriesRaces)
+        .innerJoin(races, eq(raceSeriesRaces.raceId, races.id))
+        .where(eq(raceSeriesRaces.seriesId, seriesId))
+        .orderBy(asc(raceSeriesRaces.seriesRaceNumber));
+      return result;
+    } catch (error) {
+      console.error(`Error getting series races for series ${seriesId}:`, error);
+      throw error;
+    }
   }
 
   // Series Leaderboards
@@ -634,17 +668,30 @@ export class DatabaseStorage implements IStorage {
 
   // Private helper methods
   private async getSeriesParticipantCount(seriesId: number): Promise<number> {
-    const seriesRaces = await this.getSeriesRaces(seriesId);
-    const raceIds = seriesRaces.map(sr => sr.race.id);
-    
-    if (raceIds.length === 0) return 0;
+    try {
+      const seriesRaces = await this.getSeriesRaces(seriesId);
+      
+      if (!seriesRaces || seriesRaces.length === 0) {
+        return 0;
+      }
+      const raceIds = seriesRaces
+        .filter(sr => sr && sr.race && sr.race.id)
+        .map(sr => sr.race.id);
+      
+      if (raceIds.length === 0) {
+        return 0;
+      }
 
-    const [result] = await db
-      .select({ count: count(sql`DISTINCT ${results.runnerId}`) })
-      .from(results)
-      .where(sql`${results.raceId} IN (${sql.join(raceIds, sql`, `)})`);
-    
-    return result?.count || 0;
+      const [result] = await db
+        .select({ count: count(sql`DISTINCT ${results.runnerId}`) })
+        .from(results)
+        .where(sql`${results.raceId} IN (${sql.join(raceIds, sql`, `)})`);
+      
+      return result?.count || 0;
+    } catch (error) {
+      console.error(`Error getting participant count for series ${seriesId}:`, error);
+      return 0;
+    }
   }
 
   private calculateRacePoints(result: Result, race: Race): number {

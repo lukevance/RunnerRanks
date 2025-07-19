@@ -187,6 +187,7 @@ export class RunSignupProvider {
       const response = await fetch(url);
       
       if (!response.ok) {
+        console.error(`Failed to fetch page ${page} for event ${eventId}:`, response.statusText);
         throw new Error(`RunSignup API error: ${response.statusText}`);
       }
 
