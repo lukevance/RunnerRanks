@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Upload, AlertTriangle, CheckCircle, XCircle, User, Clock, ExternalLink, FileText } from "lucide-react";
+import { ImportProgress } from "./ImportProgress";
 
 interface ImportResult {
   imported: number;
@@ -226,9 +227,17 @@ export function ImportDemo() {
       return response.json();
     },
     onSuccess: (data) => {
-      setImportResult(data.importResults);
-      setImporting(false);
-      queryClient.invalidateQueries({ queryKey: ['/api/leaderboard'] });
+      if (data.importId) {
+        // Start tracking progress for background import
+        setImportId(data.importId);
+        setShowProgress(true);
+        setImporting(false);
+      } else {
+        // Legacy response format - handle directly
+        setImportResult(data.importResults);
+        setImporting(false);
+        queryClient.invalidateQueries({ queryKey: ['/api/leaderboard'] });
+      }
     },
     onError: (error) => {
       console.error('Import failed:', error);
@@ -242,7 +251,26 @@ export function ImportDemo() {
   const handleImport = () => {
     setImporting(true);
     setImportResult(null);
+    setShowProgress(false);
+    setImportId(null);
     importMutation.mutate();
+  };
+
+  const handleProgressComplete = (result: any) => {
+    setShowProgress(false);
+    setImportResult(result.importResults || {
+      imported: result.imported || 0,
+      matched: result.matched || 0,
+      newRunners: result.newRunners || 0,
+      needsReview: result.needsReview || 0,
+      errors: []
+    });
+    queryClient.invalidateQueries({ queryKey: ['/api/leaderboard'] });
+  };
+
+  const handleProgressError = (error: string) => {
+    setShowProgress(false);
+    console.error('Import progress error:', error);
   };
 
   const getMatchingScenarios = () => [

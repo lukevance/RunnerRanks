@@ -645,9 +645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             raceId // external source ID for audit trail
           );
           
-          if (isDevMode && (matchScore < 95 && matchScore > 0)) {
-            console.log(`[RunSignupImport] Match result for ${rawRunnerData.name}: ${matchScore}% confidence, needsReview: ${needsReview}`);
-          }
+          // Performance optimization: skip individual match logging for speed
 
           // Create result record linking runner to this race
           await storage.createResult({
@@ -723,9 +721,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * @body {string} eventId - Specific event ID within the race  
    * @body {string} raceName - Optional race name override
    */
+  // In-memory store for import progress
+  const importProgress = new Map<string, any>();
+
+  // Progress endpoint for real-time updates
+  app.get("/api/import/progress/:importId", (req, res) => {
+    const importId = req.params.importId;
+    const progress = importProgress.get(importId) || { status: 'not_found' };
+    res.json(progress);
+  });
+
   app.post("/api/import/runsignup-api", async (req, res) => {
     const isDevMode = process.env.NODE_ENV === 'development';
+    const importId = `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
+    // Initialize progress tracking
+    importProgress.set(importId, {
+      status: 'starting',
+      current: 0,
+      total: 0,
+      imported: 0,
+      matched: 0,
+      newRunners: 0,
+      needsReview: 0,
+      errors: 0
+    });
+    
+    // Return import ID immediately for progress tracking
+    res.json({ success: true, importId, message: 'Import started. Use /api/import/progress/' + importId + ' to track progress.' });
+    
+    // Continue import in background
+    setImmediate(async () => {
     try {
       const { raceId, eventId, raceName } = req.body;
       
@@ -838,6 +864,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[RunSignupImport] Starting runner matching and result import...`);
       }
       
+      // Step 4: Import results with comprehensive runner matching and progress tracking
+      importProgress.set(importId, {
+        status: 'importing',
+        current: 0,
+        total: resultsData.length,
+        imported: 0,
+        matched: 0,
+        newRunners: 0,
+        needsReview: 0,
+        errors: 0,
+        raceName: race.name
+      });
+      
+      if (isDevMode) {
+        console.log(`[RunSignupImport] Starting runner matching and result import for ${resultsData.length} results...`);
+      }
+      
       const importResults = {
         totalResults: resultsData.length,
         imported: 0,
@@ -847,32 +890,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         errors: [] as string[]
       };
 
-      for (const result of resultsData) {
+      for (let i = 0; i < resultsData.length; i++) {
+        const result = resultsData[i];
         try {
+          // Normalize runner data from RunSignup API format
           const rawRunnerData: RawRunnerData = {
-            name: result.name,
+            name: `${result.first_name || ''} ${result.last_name || ''}`.trim(),
             age: result.age,
             gender: result.gender,
             city: result.city,
             state: result.state,
-            finishTime: result.finish_time || "0:00:00"
+            finishTime: result.finish_time || result.chip_time || result.gun_time || "0:00:00"
           };
 
-          const { runner, matchScore, needsReview } = await runnerMatcher.matchRunner(rawRunnerData, race.id.toString(), storage);
-          
+          // Data validation - skip invalid results
+          if (!rawRunnerData.name || rawRunnerData.name.trim().length === 0) {
+            importResults.errors.push(`Skipping result ${i + 1}: missing name`);
+            continue;
+          }
+
+          if (!rawRunnerData.finishTime || rawRunnerData.finishTime === "0:00:00") {
+            importResults.errors.push(`Skipping result for ${rawRunnerData.name}: missing or invalid finish time`);
+            continue;
+          }
+
+          // RUNNER MATCHING PROCESS (optimized for performance)
+          const { runner, matchScore, needsReview } = await runnerMatcher.matchRunner(
+            rawRunnerData, 
+            "runsignup", 
+            raceId 
+          );
+
+          // Create result record linking runner to this race
           await storage.createResult({
             runnerId: runner.id,
             raceId: race.id,
-            finishTime: result.finish_time || "0:00:00",
-            overallPlace: result.overall_place || 0,
+            finishTime: rawRunnerData.finishTime,
+            overallPlace: result.overall_place || result.place || 0,
             genderPlace: result.gender_place || null,
             ageGroupPlace: result.age_group_place || null,
-            sourceProvider: "runsignup-api",
+            sourceProvider: "runsignup",
             rawRunnerName: rawRunnerData.name,
             matchingScore: matchScore,
             needsReview: needsReview
           });
 
+          // Track import statistics for reporting
           importResults.imported++;
           if (matchScore >= 95) {
             importResults.matched++;
@@ -882,24 +945,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
             importResults.needsReview++;
           }
 
+          // Update progress every 25 results or on last result
+          if (i % 25 === 0 || i === resultsData.length - 1) {
+            importProgress.set(importId, {
+              status: 'importing',
+              current: i + 1,
+              total: resultsData.length,
+              imported: importResults.imported,
+              matched: importResults.matched,
+              newRunners: importResults.newRunners,
+              needsReview: importResults.needsReview,
+              errors: importResults.errors.length,
+              raceName: race.name,
+              percentage: Math.round(((i + 1) / resultsData.length) * 100)
+            });
+          }
+
         } catch (error) {
-          console.error("Error processing result:", error);
-          importResults.errors.push(`Failed to process result for ${result.name}`);
+          console.error("Error processing RunSignup result:", error);
+          importResults.errors.push(`Failed to process result ${i + 1} for ${result.first_name} ${result.last_name}: ${error.message}`);
         }
       }
 
-      console.log(`Import complete: ${importResults.imported} results imported`);
+      // Step 5: Final import summary and cleanup
+      const finalSummary = `RunSignup API import complete: ${importResults.imported}/${importResults.totalResults} results imported`;
+      console.log(finalSummary);
+      
+      if (isDevMode) {
+        console.log(`[RunSignupImport] Final statistics:`, {
+          totalResults: importResults.totalResults,
+          imported: importResults.imported,
+          matched: importResults.matched,
+          newRunners: importResults.newRunners,
+          needsReview: importResults.needsReview,
+          errors: importResults.errors.length,
+          successRate: `${((importResults.imported / importResults.totalResults) * 100).toFixed(1)}%`
+        });
+      }
 
-      res.json({
-        success: true,
+      // Mark import as completed
+      importProgress.set(importId, {
+        status: 'completed',
+        current: resultsData.length,
+        total: resultsData.length,
+        imported: importResults.imported,
+        matched: importResults.matched,
+        newRunners: importResults.newRunners,
+        needsReview: importResults.needsReview,
+        errors: importResults.errors.length,
+        raceName: race.name,
+        percentage: 100,
         race: race,
-        importResults
+        summary: finalSummary,
+        completedAt: new Date().toISOString()
       });
+
+      // Clean up progress after 5 minutes
+      setTimeout(() => {
+        importProgress.delete(importId);
+      }, 5 * 60 * 1000);
 
     } catch (error) {
       console.error("RunSignup API import error:", error);
-      res.status(500).json({ error: "Failed to import from RunSignup API: " + (error as Error).message });
+      
+      // Mark import as failed
+      importProgress.set(importId, {
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+        details: error instanceof Error ? error.stack?.substring(0, 300) : 'Unknown error'
+      });
+      
+      if (isDevMode) {
+        console.error(`[RunSignupImport] Critical error:`, {
+          message: error.message,
+          stack: error.stack?.substring(0, 300),
+          type: error.constructor.name
+        });
+      }
     }
+    });
   });
 
   app.post("/api/import/raceroster", async (req, res) => {

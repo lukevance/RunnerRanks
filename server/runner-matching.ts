@@ -73,9 +73,7 @@ export class RunnerMatchingService {
     // Step 1: Find potential matches using fuzzy matching algorithms
     const candidates = await this.findMatchingCandidates(rawData);
     
-    if (this.isDevMode) {
-      console.log(`[RunnerMatching] Found ${candidates.length} potential matches for ${rawData.name}`);
-    }
+    // Performance optimization: skip individual match logging
     
     // Step 2: No matches found - create new runner
     if (candidates.length === 0) {

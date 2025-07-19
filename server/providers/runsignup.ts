@@ -229,7 +229,7 @@ export class RunSignupProvider {
       const params: Record<string, string> = {
         event_id: eventId,
         page: page.toString(),
-        num: pageSize.toString(),
+        results_per_page: pageSize.toString(),
         // Additional parameters that might affect result availability
         include_bib: 'T',
         include_team: 'T', 
