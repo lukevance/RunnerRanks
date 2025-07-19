@@ -1,3 +1,27 @@
+/**
+ * Database Storage Layer
+ * 
+ * This file implements the persistent storage interface using PostgreSQL with Drizzle ORM.
+ * It provides CRUD operations for all core entities (runners, races, results, race series)
+ * and complex query operations for leaderboards and analytics.
+ * 
+ * Key Features:
+ * - Complete runner matching and deduplication logic
+ * - Race series management with points-based scoring
+ * - Leaderboard queries with advanced filtering
+ * - Runner review system for data quality management
+ * - Private race series with manual participant approval
+ * 
+ * Database Schema:
+ * - runners: Athlete profiles with demographics and contact info
+ * - races: Race events with timing and location details  
+ * - results: Individual race performances linking runners to races
+ * - race_series: Multi-race competitions with scoring rules
+ * - race_series_races: Junction table for races in a series
+ * - race_series_participants: Manual participant approvals for private series
+ * - runner_matches: Audit log of matching decisions for data integrity
+ */
+
 import { 
   runners, 
   races, 
@@ -100,7 +124,16 @@ export interface IStorage {
   isRunnerInPrivateSeries(seriesId: number, runnerId: number): Promise<boolean>;
 }
 
+/**
+ * PostgreSQL implementation of the storage interface using Drizzle ORM
+ * 
+ * This class handles all database operations for the running leaderboard platform.
+ * It includes sophisticated querying for leaderboards, runner matching logic,
+ * and race series management with points-based scoring systems.
+ */
 export class DatabaseStorage implements IStorage {
+  // Development logging flag - only show detailed logs in development
+  private readonly isDevMode = process.env.NODE_ENV === 'development';
   // Runners
   async getRunner(id: number): Promise<Runner | undefined> {
     const [runner] = await db.select().from(runners).where(eq(runners.id, id));

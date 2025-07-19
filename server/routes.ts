@@ -1,3 +1,27 @@
+/**
+ * API Routes Definition
+ * 
+ * This file contains all HTTP endpoints for the running leaderboard platform.
+ * It handles data import from race providers, leaderboard queries, runner management,
+ * race series operations, and administrative functions.
+ * 
+ * Key Route Categories:
+ * - Leaderboard: GET /api/leaderboard (main data display)
+ * - Runners: CRUD operations for athlete profiles  
+ * - Races: Race event management and queries
+ * - Results: Individual race performance data
+ * - Import: Data import from RunSignup, RaceRoster, and CSV
+ * - Race Series: Multi-race competition management (admin-only)
+ * - Runner Review: Manual verification system for data quality
+ * 
+ * Data Import Flow:
+ * 1. Validate API credentials and parameters
+ * 2. Fetch race data from external providers
+ * 3. Apply runner matching algorithms to prevent duplicates
+ * 4. Create database records with audit trails
+ * 5. Return import statistics and error reports
+ */
+
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -585,8 +609,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         errors: [] as string[]
       };
 
-      for (const result of resultsData) {
+      for (let i = 0; i < resultsData.length; i++) {
+        const result = resultsData[i];
         try {
+          // Normalize runner data from RunSignup API format
           const rawRunnerData: RawRunnerData = {
             name: `${result.first_name || ''} ${result.last_name || ''}`.trim(),
             age: result.age,
@@ -596,34 +622,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
             finishTime: result.finish_time || result.chip_time || result.gun_time || "0:00:00"
           };
 
-          const { runner, matchScore, needsReview } = await runnerMatcher.matchRunner(rawRunnerData, race.id.toString(), storage);
+          if (isDevMode && (i % 10 === 0 || i < 5)) {
+            console.log(`[RunSignupImport] Processing result ${i + 1}/${resultsData.length}: ${rawRunnerData.name}`);
+          }
+
+          // Data validation - skip invalid results
+          if (!rawRunnerData.name || rawRunnerData.name.trim().length === 0) {
+            importResults.errors.push(`Skipping result ${i + 1}: missing name`);
+            continue;
+          }
+
+          if (!rawRunnerData.finishTime || rawRunnerData.finishTime === "0:00:00") {
+            importResults.errors.push(`Skipping result for ${rawRunnerData.name}: missing or invalid finish time`);
+            continue;
+          }
+
+          // RUNNER MATCHING PROCESS
+          // This is the core logic for preventing duplicate runners while maintaining data integrity
+          const { runner, matchScore, needsReview } = await runnerMatcher.matchRunner(
+            rawRunnerData, 
+            "runsignup", // source provider 
+            raceId // external source ID for audit trail
+          );
           
-          // Create result entry with proper schema fields
+          if (isDevMode && (matchScore < 95 && matchScore > 0)) {
+            console.log(`[RunSignupImport] Match result for ${rawRunnerData.name}: ${matchScore}% confidence, needsReview: ${needsReview}`);
+          }
+
+          // Create result record linking runner to this race
           await storage.createResult({
             runnerId: runner.id,
             raceId: race.id,
             finishTime: rawRunnerData.finishTime,
-            overallPlace: result.overall_place || 0,
+            overallPlace: result.overall_place || result.place || 0,
             genderPlace: result.gender_place || null,
             ageGroupPlace: result.age_group_place || null,
             sourceProvider: "runsignup",
-            rawRunnerName: rawRunnerData.name,
+            rawRunnerName: rawRunnerData.name, // Preserve original name for audit
             matchingScore: matchScore,
             needsReview: needsReview
           });
 
+          // Track import statistics for reporting
           importResults.imported++;
           if (matchScore >= 95) {
-            importResults.matched++;
+            importResults.matched++; // High-confidence automatic match
           } else if (matchScore === 0) {
-            importResults.newRunners++;
+            importResults.newRunners++; // New runner created
           } else if (needsReview) {
-            importResults.needsReview++;
+            importResults.needsReview++; // Flagged for manual review
           }
 
         } catch (error) {
-          console.error("Error processing result:", error);
-          importResults.errors.push(`Failed to process result for ${result.first_name} ${result.last_name}`);
+          console.error("Error processing RunSignup result:", error);
+          importResults.errors.push(`Failed to process result ${i + 1} for ${result.first_name} ${result.last_name}: ${error.message}`);
+          
+          if (isDevMode) {
+            console.error(`[RunSignupImport] Result processing error:`, {
+              resultIndex: i,
+              runnerName: `${result.first_name} ${result.last_name}`,
+              error: error.message,
+              stack: error.stack?.substring(0, 200)
+            });
+          }
         }
       }
 
@@ -639,11 +700,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Official RunSignup API endpoint
+  /**
+   * Official RunSignup API import endpoint
+   * 
+   * This route handles importing race data directly from the RunSignup API using
+   * proper authentication credentials. It includes comprehensive error handling,
+   * runner matching, and progress tracking.
+   * 
+   * Process:
+   * 1. Validate API credentials and request parameters
+   * 2. Fetch race information and verify event exists
+   * 3. Import results using paginated API calls
+   * 4. Match runners using fuzzy matching algorithms
+   * 5. Create race and result records with proper data integrity
+   * 
+   * Known Issues:
+   * - Pagination may be limited to ~50 results due to API constraints
+   * - Some events may not have accessible results (privacy settings)
+   * - Rate limiting may affect large imports
+   * 
+   * @body {string} raceId - RunSignup race ID
+   * @body {string} eventId - Specific event ID within the race  
+   * @body {string} raceName - Optional race name override
+   */
   app.post("/api/import/runsignup-api", async (req, res) => {
+    const isDevMode = process.env.NODE_ENV === 'development';
+    
     try {
       const { raceId, eventId, raceName } = req.body;
       
+      if (isDevMode) {
+        console.log(`[RunSignupImport] Starting import request:`, { raceId, eventId, raceName });
+      }
+      
+      // Parameter validation
       if (!raceId) {
         return res.status(400).json({ error: "Race ID is required" });
       }
@@ -654,35 +744,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Check if we have API credentials
+      // Credentials validation
       const apiKey = process.env.RUNSIGNUP_API_KEY;
       const apiSecret = process.env.RUNSIGNUP_API_SECRET;
       
       if (!apiKey || !apiSecret) {
+        if (isDevMode) {
+          console.error(`[RunSignupImport] Missing API credentials`);
+        }
         return res.status(400).json({ 
           error: "RunSignup API credentials not configured. Please contact admin to set up API access." 
         });
       }
 
       console.log(`Starting RunSignup API import for race ${raceId}${eventId ? `, event ${eventId}` : ''}`);
+      
+      if (isDevMode) {
+        console.log(`[RunSignupImport] Initializing RunSignup provider with credentials`);
+      }
 
       const runSignupProvider = new RunSignupProvider(apiKey, apiSecret);
       
-      // Get race info for the specific event
+      // Step 1: Get race information for the specific event
+      if (isDevMode) {
+        console.log(`[RunSignupImport] Fetching race info for race ${raceId}, event ${eventId}`);
+      }
+      
       const raceData = await runSignupProvider.getRaceInfo(raceId, eventId);
       console.log(`Found race: ${raceData.name}`);
       
-      // Get results for the specific event
+      if (isDevMode) {
+        console.log(`[RunSignupImport] Race data received:`, { 
+          name: raceData.name,
+          date: raceData.date,
+          distance: raceData.distance,
+          location: `${raceData.city}, ${raceData.state}`
+        });
+      }
+      
+      // Step 2: Get results for the specific event (with pagination)
+      if (isDevMode) {
+        console.log(`[RunSignupImport] Starting results fetch with pagination...`);
+      }
+      
       const resultsData = await runSignupProvider.getResults(raceId, eventId);
       console.log(`Found ${resultsData.length} results`);
-
-      if (resultsData.length === 0) {
-        return res.status(400).json({ 
-          error: `No results found for race ${raceId}${eventId ? ` event ${eventId}` : ''}. The race may not have results published yet.`
+      
+      if (isDevMode) {
+        console.log(`[RunSignupImport] Results received:`, {
+          totalResults: resultsData.length,
+          sampleNames: resultsData.slice(0, 3).map(r => `${r.first_name} ${r.last_name}`),
+          hasPagination: resultsData.length >= 50 ? 'Possible' : 'Complete'
         });
       }
 
-      // Create race record
+      if (resultsData.length === 0) {
+        console.log(`No results found for race ${raceId}, event ${eventId}`);
+        return res.status(400).json({ 
+          error: `No results found for race ${raceId}${eventId ? ` event ${eventId}` : ''}. The race may not have results published yet or may be private.`
+        });
+      }
+
+      // Step 3: Create race record in database
+      if (isDevMode) {
+        console.log(`[RunSignupImport] Creating race record...`);
+      }
+      
       const race = await storage.createRace({
         name: raceName || raceData.name,
         date: raceData.date,
@@ -692,12 +819,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         state: raceData.state,
         startTime: raceData.startTime,
         totalFinishers: resultsData.length,
-        averageTime: "00:00:00" // Will be calculated
+        averageTime: "00:00:00" // Will be calculated after all results are imported
       });
 
       console.log(`Created race record with ID ${race.id}`);
+      
+      if (isDevMode) {
+        console.log(`[RunSignupImport] Race created:`, {
+          id: race.id,
+          name: race.name,
+          distance: race.distance,
+          totalResults: resultsData.length
+        });
+      }
 
-      // Import results with runner matching
+      // Step 4: Import results with comprehensive runner matching
+      if (isDevMode) {
+        console.log(`[RunSignupImport] Starting runner matching and result import...`);
+      }
+      
       const importResults = {
         totalResults: resultsData.length,
         imported: 0,

@@ -1,32 +1,64 @@
 import { storage } from "./storage";
 import type { Runner, InsertRunner, InsertRunnerMatch } from "@shared/schema";
 
+/**
+ * Raw runner data structure as received from race result providers
+ * This is the normalized format after parsing provider-specific data
+ */
 export interface RawRunnerData {
   name: string;
   age?: number;
   gender?: string;
   city?: string;
   state?: string;
-  location?: string; // Combined city/state from some providers
+  location?: string; // Combined city/state from some providers (e.g., "Fort Collins, CO")
   email?: string;
   finishTime: string;
-  // Provider-specific fields
+  // Provider-specific fields for debugging and additional matching
   [key: string]: any;
 }
 
+/**
+ * Represents a potential match between raw data and existing runner
+ * Used for ranking and selecting the best match
+ */
 export interface MatchCandidate {
   runner: Runner;
-  score: number;
-  reasons: string[];
+  score: number; // 0-100 confidence score
+  reasons: string[]; // List of matching criteria (name, age, location, etc.)
 }
 
+/**
+ * RunnerMatchingService handles the complex logic of matching incoming race results
+ * with existing runners in the database to prevent duplicates and maintain data integrity.
+ * 
+ * Matching Thresholds:
+ * - AUTO_MATCH (95%+): Automatic match, no review needed
+ * - HIGH_CONFIDENCE (85-94%): Match but flag for manual review
+ * - MEDIUM_CONFIDENCE (60-84%): Needs manual review before matching
+ * - LOW_CONFIDENCE (<60%): Create new runner entry
+ */
 export class RunnerMatchingService {
   private readonly HIGH_CONFIDENCE_THRESHOLD = 85;
   private readonly AUTO_MATCH_THRESHOLD = 95;
   private readonly MIN_MATCH_THRESHOLD = 60;
 
+  // Development logging flag - only log in development environment
+  private readonly isDevMode = process.env.NODE_ENV === 'development';
+
   /**
-   * Main method to find or create a runner from raw race data
+   * Main entry point for runner matching algorithm
+   * 
+   * Process:
+   * 1. Search for potential matches using fuzzy string matching
+   * 2. Score matches based on name similarity, demographics, and location
+   * 3. Apply confidence thresholds to determine if match should be automatic,
+   *    flagged for review, or if a new runner should be created
+   * 
+   * @param rawData - Normalized runner data from race provider
+   * @param sourceProvider - Name of the data source (e.g., "RunSignup", "RaceRoster")
+   * @param sourceRaceId - External race ID for audit trail
+   * @returns Object with matched/created runner, confidence score, and review flag
    */
   async matchRunner(
     rawData: RawRunnerData, 
@@ -34,90 +66,150 @@ export class RunnerMatchingService {
     sourceRaceId: string
   ): Promise<{ runner: Runner; matchScore: number; needsReview: boolean }> {
     
-    // First, try to find existing matches
+    if (this.isDevMode) {
+      console.log(`[RunnerMatching] Processing: ${rawData.name} (${sourceProvider})`);
+    }
+    
+    // Step 1: Find potential matches using fuzzy matching algorithms
     const candidates = await this.findMatchingCandidates(rawData);
     
+    if (this.isDevMode) {
+      console.log(`[RunnerMatching] Found ${candidates.length} potential matches for ${rawData.name}`);
+    }
+    
+    // Step 2: No matches found - create new runner
     if (candidates.length === 0) {
-      // No matches found, create new runner
+      if (this.isDevMode) {
+        console.log(`[RunnerMatching] No matches found, creating new runner: ${rawData.name}`);
+      }
       const newRunner = await this.createRunnerFromRawData(rawData);
       return { runner: newRunner, matchScore: 100, needsReview: false };
     }
 
-    const bestMatch = candidates[0];
+    const bestMatch = candidates[0]; // Candidates are sorted by score descending
+    
+    if (this.isDevMode) {
+      console.log(`[RunnerMatching] Best match: ${bestMatch.runner.name} (${bestMatch.score}% confidence)`);
+      console.log(`[RunnerMatching] Match reasons: ${bestMatch.reasons.join(', ')}`);
+    }
 
-    // Auto-match if confidence is very high
+    // Step 3: Apply confidence-based decision making
+    
+    // AUTO_MATCH: Very high confidence, proceed automatically
     if (bestMatch.score >= this.AUTO_MATCH_THRESHOLD) {
       await this.logMatch(rawData, bestMatch, sourceProvider, sourceRaceId, "auto_matched");
+      if (this.isDevMode) {
+        console.log(`[RunnerMatching] AUTO-MATCHED: ${rawData.name} -> ${bestMatch.runner.name}`);
+      }
       return { runner: bestMatch.runner, matchScore: bestMatch.score, needsReview: false };
     }
 
-    // High confidence but not auto-match - still proceed but flag for review
+    // HIGH_CONFIDENCE: Good match but flag for admin review
     if (bestMatch.score >= this.HIGH_CONFIDENCE_THRESHOLD) {
       await this.logMatch(rawData, bestMatch, sourceProvider, sourceRaceId, "approved");
+      if (this.isDevMode) {
+        console.log(`[RunnerMatching] HIGH-CONFIDENCE MATCH: ${rawData.name} -> ${bestMatch.runner.name} (flagged for review)`);
+      }
       return { runner: bestMatch.runner, matchScore: bestMatch.score, needsReview: true };
     }
 
-    // Medium confidence - definitely needs review
+    // MEDIUM_CONFIDENCE: Possible match but requires manual verification
     if (bestMatch.score >= this.MIN_MATCH_THRESHOLD) {
       await this.logMatch(rawData, bestMatch, sourceProvider, sourceRaceId, "pending");
-      // For now, create a new runner but mark the result as needing review
+      // Create new runner but log the potential match for admin review
       const newRunner = await this.createRunnerFromRawData(rawData);
+      if (this.isDevMode) {
+        console.log(`[RunnerMatching] MEDIUM-CONFIDENCE: Created new runner for ${rawData.name}, potential match logged for review`);
+      }
       return { runner: newRunner, matchScore: bestMatch.score, needsReview: true };
     }
 
-    // Low confidence - create new runner
+    // LOW_CONFIDENCE: No good matches, create new runner
     const newRunner = await this.createRunnerFromRawData(rawData);
+    if (this.isDevMode) {
+      console.log(`[RunnerMatching] LOW-CONFIDENCE: Created new runner for ${rawData.name}`);
+    }
     return { runner: newRunner, matchScore: 0, needsReview: false };
   }
 
   /**
-   * Find potential matching runners based on various criteria
+   * Find potential matching runners using fuzzy matching algorithms
+   * 
+   * Performance Note: Currently loads all runners into memory for comparison.
+   * For large datasets, consider implementing database-side fuzzy matching
+   * using PostgreSQL's trigram matching or similar approaches.
+   * 
+   * @param rawData - Raw runner data to match against
+   * @returns Array of candidates sorted by match score (highest first)
    */
   private async findMatchingCandidates(rawData: RawRunnerData): Promise<MatchCandidate[]> {
     const allRunners = await storage.getAllRunners();
     const candidates: MatchCandidate[] = [];
 
+    if (this.isDevMode) {
+      console.log(`[RunnerMatching] Searching through ${allRunners.length} existing runners for matches`);
+    }
+
     for (const runner of allRunners) {
       const score = this.calculateMatchScore(rawData, runner);
+      
+      // Only consider candidates above minimum threshold to reduce noise
       if (score >= this.MIN_MATCH_THRESHOLD) {
         candidates.push({
           runner,
           score,
           reasons: this.getMatchReasons(rawData, runner, score)
         });
+        
+        if (this.isDevMode && score > 80) {
+          console.log(`[RunnerMatching] High-score candidate: ${runner.name} (${score}%)`);
+        }
       }
     }
 
-    // Sort by score descending
+    // Sort by score descending to get best matches first
     return candidates.sort((a, b) => b.score - a.score);
   }
 
   /**
-   * Calculate match score between raw data and existing runner
+   * Calculate weighted match score between raw runner data and existing runner
+   * 
+   * Scoring Algorithm:
+   * - Name Similarity: 40% weight (most important factor)
+   * - Age Matching: 25% weight (exact match gets full points, tolerance for ±2 years)
+   * - Gender Matching: 15% weight (binary match)
+   * - Location Matching: 20% weight (city/state comparison with fuzzy matching)
+   * 
+   * @param rawData - Incoming runner data
+   * @param runner - Existing runner from database
+   * @returns Percentage score (0-100)
    */
   private calculateMatchScore(rawData: RawRunnerData, runner: Runner): number {
     let score = 0;
     let maxScore = 0;
 
-    // Name matching (most important)
+    // NAME MATCHING (40% of total score)
+    // Uses Levenshtein distance and handles common name variations
     const nameScore = this.calculateNameSimilarity(rawData.name, runner.name);
-    score += nameScore * 0.4; // 40% weight
+    score += nameScore * 0.4; // 40% weight - most important factor
     maxScore += 40;
 
-    // Age matching
+    // AGE MATCHING (25% of total score)
+    // Considers age changes between races and data entry variations
     if (rawData.age && runner.age) {
       const ageDiff = Math.abs(rawData.age - runner.age);
       let ageScore = 0;
-      if (ageDiff === 0) ageScore = 25;
-      else if (ageDiff === 1) ageScore = 20;
-      else if (ageDiff === 2) ageScore = 15;
-      else if (ageDiff <= 5) ageScore = 10;
+      if (ageDiff === 0) ageScore = 25;        // Perfect match
+      else if (ageDiff === 1) ageScore = 20;   // Very close (birthday timing)
+      else if (ageDiff === 2) ageScore = 15;   // Close (different race years)
+      else if (ageDiff <= 5) ageScore = 10;    // Reasonable tolerance
       
       score += ageScore;
     }
     maxScore += 25;
 
-    // Gender matching
+    // GENDER MATCHING (15% of total score)
+    // Binary match with normalization for different input formats
     if (rawData.gender && runner.gender) {
       if (this.normalizeGender(rawData.gender) === runner.gender) {
         score += 15;
@@ -125,12 +217,13 @@ export class RunnerMatchingService {
     }
     maxScore += 15;
 
-    // Location matching
+    // LOCATION MATCHING (20% of total score)
+    // Compares city/state with fuzzy matching for abbreviations and variations
     const locationScore = this.calculateLocationSimilarity(rawData, runner);
     score += locationScore;
     maxScore += 20;
 
-    // Convert to percentage
+    // Convert to percentage (0-100)
     return maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
   }
 

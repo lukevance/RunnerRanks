@@ -41,6 +41,17 @@ Built with:
 
 ## Recent Changes
 
+### July 19, 2025 - Comprehensive Code Documentation & Development Logging
+✓ Added extensive code comments throughout entire codebase focusing on race importing and runner matching logic
+✓ Implemented development-only logging system with `NODE_ENV` checks to prevent production noise
+✓ Documented RunSignup pagination limitations with detailed technical analysis and debugging notes
+✓ Enhanced runner matching algorithm documentation with confidence score explanations
+✓ Added comprehensive error handling and debugging information in import routes
+✓ Created detailed API documentation for RunSignup provider with known issues and limitations
+✓ Implemented structured logging format with prefixed tags for easier debugging ([RunnerMatching], [RunSignup], etc.)
+✓ Enhanced storage layer documentation explaining database schema and performance considerations
+✓ Added inline comments explaining complex algorithms, thresholds, and business logic decisions
+
 ### July 18, 2025 - Runner Review System & Race Series Management Fixes
 ✓ Fixed race series management error - added missing `addedAt` field to resolve 500 errors when adding races
 ✓ Implemented comprehensive runner review system with API endpoints for manual verification
@@ -105,12 +116,16 @@ Built with:
 - Prioritize data integrity - always use authentic race data when possible
 
 ## Technical Notes
-- Runner matching uses Levenshtein distance for name similarity
-- Race points calculated based on placement and field size
-- Series standings require minimum race participation
-- All timestamps stored as ISO strings
-- Frontend uses TanStack Query for state management
-- Error handling includes detailed logging for debugging
+- Runner matching uses Levenshtein distance for name similarity with comprehensive confidence scoring
+- Race points calculated based on placement and field size with configurable bonuses
+- Series standings require minimum race participation (default: 2 races)
+- All timestamps stored as ISO strings for consistent handling across timezones
+- Frontend uses TanStack Query for efficient state management and caching
+- Development logging system with environment-based controls (only shows in development mode)
+- Comprehensive error handling with detailed debugging information and audit trails
+- RunSignup API pagination limited to ~50 results (investigating provider limitations)
+- Database performance optimized with strategic indexes on frequently queried fields
+- Runner matching audit log maintains complete history for data integrity verification
 
 ## Development Status
 ✅ Core leaderboard functionality

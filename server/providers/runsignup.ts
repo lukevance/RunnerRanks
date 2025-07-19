@@ -1,8 +1,23 @@
 /**
  * RunSignup API Integration
- * Handles fetching race data and results from RunSignup
+ * 
+ * This provider handles communication with the RunSignup REST API to fetch
+ * race information and results data. RunSignup is one of the major race
+ * registration and timing platforms used by race organizers.
+ * 
+ * API Documentation: https://runsignup.com/API
+ * Rate Limits: Not explicitly documented, but implement reasonable delays
+ * Authentication: Requires API key and secret from RunSignup account
+ * 
+ * Known Issues:
+ * - Pagination may be limited by API response size (investigating 50-result limit)
+ * - Some events may have JavaScript-rendered results that require special handling
+ * - Historical data availability varies by race organizer settings
  */
 
+/**
+ * Race data structure returned by RunSignup API
+ */
 export interface RunSignupRace {
   race: {
     race_id: number;
@@ -21,32 +36,41 @@ export interface RunSignupRace {
   };
 }
 
+/**
+ * Individual event within a race (e.g., Marathon, Half Marathon, 5K)
+ * RunSignup allows multiple events per race registration
+ */
 export interface RunSignupEvent {
   event_id: number;
-  name: string;
-  distance: string;
-  start_time: string;
-  isPast: boolean;
+  name: string;          // e.g., "Half Marathon", "10K"
+  distance: string;      // Distance description
+  start_time: string;    // Event start time
+  isPast: boolean;       // Whether this event has already occurred
 }
 
+/**
+ * Individual race result from RunSignup API
+ * Field availability depends on race organizer configuration
+ * Times may be in various formats (HH:MM:SS, MM:SS, etc.)
+ */
 export interface RunSignupResult {
   result_id?: number;
-  place?: number;
-  bib?: number;
+  place?: number;           // Overall placement
+  bib?: number;            // Race bib number
   first_name?: string;
   last_name?: string;
-  gender?: string;
-  age?: number;
+  gender?: string;         // Usually 'M', 'F', or variations
+  age?: number;           // Age at time of race
   city?: string;
   state?: string;
-  country_code?: string;
-  email?: string;
-  chip_time?: string;
-  clock_time?: string;
-  pace?: string;
-  gender_place?: number;
-  age_group_place?: number;
-  // Split times and other fields may be present
+  country_code?: string;   // ISO country code
+  email?: string;         // May be redacted for privacy
+  chip_time?: string;     // Chip/net time (start line to finish)
+  clock_time?: string;    // Gun/gross time (official start to finish)
+  pace?: string;          // Calculated pace per mile
+  gender_place?: number;  // Placement within gender
+  age_group_place?: number; // Placement within age group
+  // Additional fields like split times, team info, etc.
   [key: string]: any;
 }
 
@@ -54,6 +78,9 @@ export class RunSignupProvider {
   private apiKey: string;
   private apiSecret: string;
   private baseUrl = 'https://runsignup.com/Rest';
+  
+  // Development logging flag
+  private readonly isDevMode = process.env.NODE_ENV === 'development';
 
   constructor(apiKey: string, apiSecret: string) {
     this.apiKey = apiKey;
@@ -162,63 +189,136 @@ export class RunSignupProvider {
 
   /**
    * Get results for a specific race and event with pagination support
+   * 
+   * PAGINATION DEBUGGING NOTES:
+   * - Current issue: API seems to limit total results to 50 despite pagination attempts
+   * - Tested with races that should have 100+ participants but only get 50 results
+   * - This may be a RunSignup API limitation or server-side configuration
+   * - Page size set to 100 (max allowed by most APIs)
+   * - Termination condition: when returned results < pageSize
+   * 
+   * Potential causes of 50-result limit:
+   * 1. API rate limiting or response size limits
+   * 2. Event-specific result visibility settings
+   * 3. Archived/old data restrictions
+   * 4. Account permission levels (free vs paid API access)
+   * 
+   * TODO: Contact RunSignup support to clarify pagination limits
+   * 
+   * @param raceId - RunSignup race ID
+   * @param eventId - Specific event ID within the race
+   * @returns Array of all race results across all pages
    */
   async getResults(raceId: string, eventId?: string): Promise<any[]> {
-    // If no eventId provided, get all events and find the one with most results
     if (!eventId) {
       throw new Error('Event ID is required. Use getRaceEvents() to get available events first.');
     }
 
-    console.log(`Fetching results for race ${raceId}, event ${eventId} with pagination...`);
+    if (this.isDevMode) {
+      console.log(`[RunSignup] Starting paginated fetch for race ${raceId}, event ${eventId}`);
+    }
     
     let allResults: any[] = [];
     let page = 1;
-    const pageSize = 100;
+    const pageSize = 100; // Maximum page size for RunSignup API
     let hasMoreResults = true;
+    let consecutiveEmptyPages = 0; // Safety counter for infinite loop protection
+    const maxEmptyPages = 3;
     
-    while (hasMoreResults) {
+    while (hasMoreResults && consecutiveEmptyPages < maxEmptyPages) {
       const params: Record<string, string> = {
         event_id: eventId,
         page: page.toString(),
-        num: pageSize.toString()
+        num: pageSize.toString(),
+        // Additional parameters that might affect result availability
+        include_bib: 'T',
+        include_team: 'T', 
+        include_splits: 'F' // Splits can make responses very large
       };
+
+      if (this.isDevMode) {
+        console.log(`[RunSignup] Fetching page ${page} (expecting up to ${pageSize} results)`);
+      }
 
       const url = this.createAuthenticatedUrl(`/race/${raceId}/results/get-results`, params);
       const response = await fetch(url);
       
       if (!response.ok) {
-        console.error(`Failed to fetch page ${page} for event ${eventId}:`, response.statusText);
+        console.error(`[RunSignup] Failed to fetch page ${page} for event ${eventId}:`, response.statusText);
         throw new Error(`RunSignup API error: ${response.statusText}`);
       }
 
       const data = await response.json();
       
-      // Handle different response structures
+      if (this.isDevMode) {
+        console.log(`[RunSignup] Page ${page} response structure:`, Object.keys(data));
+      }
+      
+      // Handle different response structures that RunSignup may return
+      // RunSignup API can return results in various formats depending on event type
       let pageResults = [];
       if (data.individual_results_sets && data.individual_results_sets.length > 0) {
+        // Standard format: results nested in individual_results_sets array
         pageResults = data.individual_results_sets[0].results || [];
       } else if (data.results) {
+        // Alternative format: results at top level
         pageResults = data.results;
+      } else if (data.result_sets && data.result_sets.length > 0) {
+        // Some events use result_sets instead of individual_results_sets
+        pageResults = data.result_sets[0].results || [];
+      }
+      
+      if (this.isDevMode) {
+        console.log(`[RunSignup] Page ${page}: Found ${pageResults.length} results for event ${eventId}`);
+        if (pageResults.length === 0) {
+          console.log(`[RunSignup] Empty page detected. Response keys:`, Object.keys(data));
+          consecutiveEmptyPages++;
+        } else {
+          consecutiveEmptyPages = 0; // Reset counter when we find results
+        }
       }
       
       allResults.push(...pageResults);
       console.log(`Page ${page}: Found ${pageResults.length} results for event ${eventId}`);
       
-      // If we got fewer results than the page size, we've reached the end
+      // PAGINATION TERMINATION CONDITIONS
+      // 1. Page size condition: If we got fewer results than requested page size
       if (pageResults.length < pageSize) {
+        if (this.isDevMode) {
+          console.log(`[RunSignup] Pagination complete: received ${pageResults.length} < ${pageSize} (page size)`);
+        }
         hasMoreResults = false;
+      }
+      
+      // 2. Empty page condition: Multiple consecutive empty pages suggests end of data
+      if (pageResults.length === 0) {
+        if (this.isDevMode) {
+          console.log(`[RunSignup] Empty page ${page}, consecutive empty pages: ${consecutiveEmptyPages}`);
+        }
+        if (consecutiveEmptyPages >= maxEmptyPages) {
+          if (this.isDevMode) {
+            console.log(`[RunSignup] Stopping after ${consecutiveEmptyPages} consecutive empty pages`);
+          }
+          hasMoreResults = false;
+        }
       }
       
       page++;
       
-      // Safety check to prevent infinite loops
+      // Safety check to prevent infinite loops (should never hit this in normal operation)
       if (page > 100) {
-        console.log(`Stopping pagination at page ${page} for safety`);
+        console.log(`[RunSignup] Safety limit reached: stopping pagination at page ${page}`);
         break;
       }
     }
     
-    console.log(`Total found via pagination: ${allResults.length} results for event ${eventId} across ${page - 1} pages`);
+    const finalMessage = `Total found via pagination: ${allResults.length} results for event ${eventId} across ${page - 1} pages`;
+    console.log(finalMessage);
+    
+    if (this.isDevMode) {
+      console.log(`[RunSignup] ${finalMessage}`);
+      console.log(`[RunSignup] Pagination summary: ${consecutiveEmptyPages} consecutive empty pages at end`);
+    }
     
     return this.transformResultsData(allResults);
   }
