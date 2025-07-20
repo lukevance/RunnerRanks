@@ -50,7 +50,8 @@ Built with:
 ✓ Fixed TypeScript errors in storage layer causing leaderboard API failures
 ✓ Enhanced leaderboard query with proper error handling and logging
 ✓ Resolved real-time progress tracking endpoint routing issues
-✓ Updated all database operations to handle nullable fields properly
+✓ Updated all database operations to handle nullable fields properly  
+✓ Fixed critical leaderboard interval parsing error by filtering invalid finish times (DQ, DNF)
 ✓ Added comprehensive race information display with participant counts and metadata
 
 ### July 19, 2025 - RunSignup Optimization & Real-Time Progress Tracking

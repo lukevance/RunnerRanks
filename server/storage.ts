@@ -299,6 +299,10 @@ export class DatabaseStorage implements IStorage {
       ));
     }
 
+    // Filter out invalid finish times (like "DQ", "DNF", etc.) that can't be parsed as intervals
+    const validTimeCondition = sql`${results.finishTime} ~ '^[0-9]+:[0-9]{2}:[0-9]{2}(\.[0-9]+)?$'`;
+    conditions.push(validTimeCondition);
+
     if (conditions.length > 0) {
       query = query.where(and(...conditions));
     }
