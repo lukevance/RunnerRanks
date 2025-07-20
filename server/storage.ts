@@ -228,12 +228,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getResultsByRunner(runnerId: number): Promise<(Result & { race: Race })[]> {
-    return await db
+    const queryResult = await db
       .select()
       .from(results)
       .innerJoin(races, eq(results.raceId, races.id))
       .where(eq(results.runnerId, runnerId))
       .orderBy(desc(races.date));
+      
+    // Transform the nested structure to match the expected format
+    return queryResult.map((row: any) => ({
+      ...row.results,
+      race: row.races
+    }));
   }
 
   async getResultsByRace(raceId: number): Promise<(Result & { runner: Runner })[]> {
@@ -319,34 +325,47 @@ export class DatabaseStorage implements IStorage {
     const runner = await this.getRunner(id);
     if (!runner) return undefined;
 
-    const runnerResults = await this.getResultsByRunner(id);
-    
-    // Calculate stats
-    const marathonTimes = runnerResults
-      .filter(r => r.race.distance === 'Marathon')
-      .map(r => r.finishTime)
-      .sort();
-    
-    const halfMarathonTimes = runnerResults
-      .filter(r => r.race.distance === 'Half Marathon')
-      .map(r => r.finishTime)
-      .sort();
+    try {
+      const runnerResults = await this.getResultsByRunner(id);
+      
+      // Calculate stats
+      const marathonTimes = runnerResults
+        .filter(r => r.race.distance === 'Marathon')
+        .map(r => r.finishTime)
+        .sort();
+      
+      const halfMarathonTimes = runnerResults
+        .filter(r => r.race.distance === 'Half Marathon')
+        .map(r => r.finishTime)
+        .sort();
 
-    const currentYear = new Date().getFullYear();
-    const racesThisYear = runnerResults.filter(r => 
-      new Date(r.race.date).getFullYear() === currentYear
-    ).length;
+      const currentYear = new Date().getFullYear();
+      const racesThisYear = runnerResults.filter(r => 
+        new Date(r.race.date).getFullYear() === currentYear
+      ).length;
 
-    const ageGroupWins = runnerResults.filter(r => r.ageGroupPlace === 1).length;
+      const ageGroupWins = runnerResults.filter(r => r.ageGroupPlace === 1).length;
 
-    return {
-      ...runner,
-      marathonPR: marathonTimes[0],
-      halfMarathonPR: halfMarathonTimes[0],
-      racesThisYear,
-      ageGroupWins,
-      results: runnerResults
-    };
+      return {
+        ...runner,
+        marathonPR: marathonTimes[0],
+        halfMarathonPR: halfMarathonTimes[0],
+        racesThisYear,
+        ageGroupWins,
+        results: runnerResults
+      };
+    } catch (error) {
+      console.error(`Error getting results for runner ${id}:`, error);
+      // Return basic runner info with empty stats if there's an error
+      return {
+        ...runner,
+        marathonPR: undefined,
+        halfMarathonPR: undefined,
+        racesThisYear: 0,
+        ageGroupWins: 0,
+        results: []
+      };
+    }
   }
 
   // Race Series

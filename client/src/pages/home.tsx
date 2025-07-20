@@ -98,27 +98,57 @@ function DistanceLeaderboard({ distance, label, distanceMiles }: DistanceLeaderb
       </div>
       
       <div className="space-y-3">
-        {entries.map((entry, index) => (
-          <div key={entry.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-b-0">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-performance-blue/10 rounded-full flex items-center justify-center text-sm font-medium text-performance-blue">
-                {index + 1}
+        {entries.map((entry, index) => {
+          const getAgeGroup = (age: number) => {
+            if (age < 20) return 'U20';
+            if (age < 30) return '20-29';
+            if (age < 40) return '30-39';
+            if (age < 50) return '40-49';
+            if (age < 60) return '50-59';
+            if (age < 70) return '60-69';
+            return '70+';
+          };
+
+          return (
+            <div key={entry.id} className="grid grid-cols-12 gap-2 py-3 border-b border-slate-100 last:border-b-0 items-center">
+              <div className="col-span-1">
+                <div className="w-8 h-8 bg-performance-blue/10 rounded-full flex items-center justify-center text-sm font-medium text-performance-blue">
+                  {index + 1}
+                </div>
               </div>
-              <div>
-                <Link href={`/runner/${entry.runner.id}`} className="font-medium text-slate-900 hover:text-performance-blue">
+              <div className="col-span-4">
+                <Link href={`/runner-profile/${entry.runner.id}`} className="font-medium text-slate-900 hover:text-performance-blue">
                   {entry.runner.name}
                 </Link>
                 <div className="text-xs text-slate-500">
                   {entry.runner.city && entry.runner.state && `${entry.runner.city}, ${entry.runner.state}`}
                 </div>
               </div>
+              <div className="col-span-2 text-right">
+                <div className="font-medium text-slate-900">{entry.result.finishTime}</div>
+                <div className="text-xs text-slate-500">{calculatePace(entry.result.finishTime, distanceMiles)} pace</div>
+              </div>
+              <div className="col-span-3">
+                <Link href={`/race-details/${entry.race.id}`} className="text-sm text-blue-600 hover:text-blue-800">
+                  {entry.race.name}
+                </Link>
+                <div className="text-xs text-slate-500">
+                  {new Date(entry.race.date).toLocaleDateString()}
+                </div>
+              </div>
+              <div className="col-span-2 text-center">
+                <div className="text-sm font-medium">
+                  {entry.runner.age ? `${entry.runner.age} ${entry.runner.gender || ''}` : entry.runner.gender || 'N/A'}
+                </div>
+                {entry.runner.age && (
+                  <div className="text-xs text-slate-500">
+                    {getAgeGroup(entry.runner.age)}
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="text-right">
-              <div className="font-medium text-slate-900">{entry.result.finishTime}</div>
-              <div className="text-xs text-slate-500">{calculatePace(entry.result.finishTime, distanceMiles)} pace</div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {entries.length > 0 && (

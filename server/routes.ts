@@ -67,14 +67,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/runners/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const runner = await storage.getRunnerWithStats(id);
+      console.log(`Getting runner with stats for ID: ${id}`);
       
+      // Get basic runner info
+      const runner = await storage.getRunner(id);
       if (!runner) {
         return res.status(404).json({ error: "Runner not found" });
       }
       
-      res.json(runner);
+      try {
+        // Try to get stats, fallback to basic runner if stats fail
+        const runnerWithStats = await storage.getRunnerWithStats(id);
+        res.json(runnerWithStats || runner);
+      } catch (statsError) {
+        console.error(`Stats calculation failed for runner ${id}:`, statsError);
+        // Return basic runner info if stats calculation fails
+        res.json({
+          ...runner,
+          marathonPR: undefined,
+          halfMarathonPR: undefined,
+          racesThisYear: 0,
+          ageGroupWins: 0,
+          results: []
+        });
+      }
     } catch (error) {
+      console.error(`Runner API error for ID ${req.params.id}:`, error);
       res.status(500).json({ error: "Failed to fetch runner" });
     }
   });

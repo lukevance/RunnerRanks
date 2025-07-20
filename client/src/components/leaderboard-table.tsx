@@ -102,7 +102,7 @@ export function LeaderboardTable({ filters }: LeaderboardTableProps) {
                   Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Age
+                  Age/Gender
                 </th>
               </tr>
             </thead>
@@ -177,8 +177,20 @@ export function LeaderboardTable({ filters }: LeaderboardTableProps) {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                       {formatDate(entry.race.date)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                      {entry.runner.age}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-slate-900">
+                        {entry.runner.age ? `${entry.runner.age} ${entry.runner.gender || ''}` : entry.runner.gender || 'N/A'}
+                      </div>
+                      {entry.runner.age && (
+                        <div className="text-xs text-slate-500">
+                          {entry.runner.age < 20 ? 'U20' : 
+                           entry.runner.age < 30 ? '20-29' :
+                           entry.runner.age < 40 ? '30-39' :
+                           entry.runner.age < 50 ? '40-49' :
+                           entry.runner.age < 60 ? '50-59' :
+                           entry.runner.age < 70 ? '60-69' : '70+'}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
