@@ -41,6 +41,18 @@ Built with:
 
 ## Recent Changes
 
+### July 20, 2025 - Database Management & Race Deletion System
+✓ Added comprehensive race deletion functionality with cascade delete for results
+✓ Created RaceManager component with race listing, details, and delete capabilities
+✓ Implemented DELETE /api/races/:id API endpoint with proper error handling
+✓ Integrated race management into admin panel "Race Management" tab
+✓ Added database clearing functionality for testing purposes
+✓ Fixed TypeScript errors in storage layer causing leaderboard API failures
+✓ Enhanced leaderboard query with proper error handling and logging
+✓ Resolved real-time progress tracking endpoint routing issues
+✓ Updated all database operations to handle nullable fields properly
+✓ Added comprehensive race information display with participant counts and metadata
+
 ### July 19, 2025 - RunSignup Optimization & Real-Time Progress Tracking
 ✓ Fixed critical RunSignup pagination bug by correcting parameter from "num" to "results_per_page" 
 ✓ Optimized import performance by removing individual runner logging during large imports (1200+ runners)

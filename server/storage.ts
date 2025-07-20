@@ -180,10 +180,14 @@ export class DatabaseStorage implements IStorage {
         state: races.state,
         distance: races.distance,
         distanceMiles: races.distanceMiles,
+        startTime: races.startTime,
+        totalFinishers: races.totalFinishers,
+        averageTime: races.averageTime,
         courseType: races.courseType,
         elevation: races.elevation,
         weather: races.weather,
-
+        organizerWebsite: races.organizerWebsite,
+        resultsUrl: races.resultsUrl,
         participants: count(results.id).as('participants')
       })
       .from(races)
@@ -205,7 +209,7 @@ export class DatabaseStorage implements IStorage {
       // Then delete the race itself
       const deleteResult = await db.delete(races).where(eq(races.id, id));
       
-      return deleteResult.rowCount > 0;
+      return deleteResult.rowCount ? deleteResult.rowCount > 0 : false;
     } catch (error) {
       console.error('Error deleting race:', error);
       return false;
@@ -299,17 +303,12 @@ export class DatabaseStorage implements IStorage {
       query = query.where(and(...conditions));
     }
 
-    query = query.orderBy(asc(sql`EXTRACT(EPOCH FROM ${results.finishTime}::interval)`));
+    const finalQuery = query
+      .orderBy(asc(sql`EXTRACT(EPOCH FROM ${results.finishTime}::interval)`))
+      .limit(filters?.limit || 100)
+      .offset(filters?.offset || 0);
 
-    if (filters?.limit) {
-      query = query.limit(filters.limit);
-    }
-    
-    if (filters?.offset) {
-      query = query.offset(filters.offset);
-    }
-
-    return await query;
+    return await finalQuery;
   }
 
   async getRunnerWithStats(id: number): Promise<RunnerWithStats | undefined> {

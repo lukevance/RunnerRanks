@@ -49,6 +49,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const entries = await storage.getLeaderboard(filters);
       res.json(entries);
     } catch (error) {
+      console.error('Leaderboard error:', error);
       res.status(500).json({ error: "Failed to fetch leaderboard" });
     }
   });
