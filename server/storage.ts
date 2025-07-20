@@ -65,6 +65,7 @@ export interface IStorage {
   createRace(race: InsertRace): Promise<Race>;
   getAllRaces(): Promise<Race[]>;
   getAllRacesWithStats(): Promise<(Race & { participants: number })[]>;
+  deleteRace(id: number): Promise<boolean>;
   
   // Results
   getResult(id: number): Promise<Result | undefined>;
@@ -194,6 +195,21 @@ export class DatabaseStorage implements IStorage {
       ...race,
       participants: Number(race.participants)
     }));
+  }
+
+  async deleteRace(id: number): Promise<boolean> {
+    try {
+      // First delete all results for this race (cascade delete)
+      await db.delete(results).where(eq(results.raceId, id));
+      
+      // Then delete the race itself
+      const deleteResult = await db.delete(races).where(eq(races.id, id));
+      
+      return deleteResult.rowCount > 0;
+    } catch (error) {
+      console.error('Error deleting race:', error);
+      return false;
+    }
   }
 
   // Results

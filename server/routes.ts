@@ -129,6 +129,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/races/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteRace(id);
+      if (success) {
+        res.json({ success: true, message: "Race deleted successfully" });
+      } else {
+        res.status(404).json({ error: "Race not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete race" });
+    }
+  });
+
   app.get("/api/races/:id/results", async (req, res) => {
     try {
       const id = parseInt(req.params.id);

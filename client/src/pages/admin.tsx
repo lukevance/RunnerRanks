@@ -1,6 +1,7 @@
 import { Header } from "@/components/header";
 import { ImportDemo } from "@/components/import-demo";
 import { RaceSeriesManager } from "@/components/race-series-manager";
+import { RaceManager } from "@/components/race-manager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Admin() {
@@ -56,8 +57,7 @@ export default function Admin() {
 
           <TabsContent value="races">
             <div className="bg-white rounded-lg border p-6">
-              <h2 className="text-xl font-semibold text-slate-900 mb-4">Race Management</h2>
-              <p className="text-slate-600">Individual race management features coming soon...</p>
+              <RaceManager />
             </div>
           </TabsContent>
 
