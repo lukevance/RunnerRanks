@@ -761,13 +761,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Parameter validation
       if (!raceId) {
-        return res.status(400).json({ error: "Race ID is required" });
+        importProgress.set(importId, {
+          status: 'failed',
+          error: "Race ID is required"
+        });
+        return;
       }
 
       if (!eventId) {
-        return res.status(400).json({ 
-          error: "Event ID is required. Please use /api/runsignup/race/:raceId/events to get available events first." 
+        importProgress.set(importId, {
+          status: 'failed',
+          error: "Event ID is required. Please use /api/runsignup/race/:raceId/events to get available events first."
         });
+        return;
       }
 
       // Credentials validation
@@ -778,9 +784,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (isDevMode) {
           console.error(`[RunSignupImport] Missing API credentials`);
         }
-        return res.status(400).json({ 
-          error: "RunSignup API credentials not configured. Please contact admin to set up API access." 
+        importProgress.set(importId, {
+          status: 'failed',
+          error: "RunSignup API credentials not configured. Please contact admin to set up API access."
         });
+        return;
       }
 
       console.log(`Starting RunSignup API import for race ${raceId}${eventId ? `, event ${eventId}` : ''}`);
@@ -826,9 +834,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (resultsData.length === 0) {
         console.log(`No results found for race ${raceId}, event ${eventId}`);
-        return res.status(400).json({ 
+        importProgress.set(importId, {
+          status: 'failed',
           error: `No results found for race ${raceId}${eventId ? ` event ${eventId}` : ''}. The race may not have results published yet or may be private.`
         });
+        return;
       }
 
       // Step 3: Create race record in database

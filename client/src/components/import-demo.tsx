@@ -593,8 +593,31 @@ Jennifer Wang,26,F,San Francisco,CA,2:48:15,6,3`)}
         </div>
       </div>
 
+      {/* Import Progress */}
+      {showProgress && importId && (
+        <ImportProgress 
+          importId={importId}
+          onComplete={(result) => {
+            setShowProgress(false);
+            setImporting(false);
+            setImportResult({
+              imported: result.imported || 0,
+              matched: result.matched || 0,
+              newRunners: result.newRunners || 0,
+              needsReview: result.needsReview || 0,
+              errors: []
+            });
+          }}
+          onError={(error) => {
+            setShowProgress(false);
+            setImporting(false);
+            console.error('Import failed:', error);
+          }}
+        />
+      )}
+
       {/* Import Results */}
-      {importResult && (
+      {importResult && !showProgress && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <h3 className="text-lg font-semibold text-slate-900 mb-4">Import Results</h3>
           
