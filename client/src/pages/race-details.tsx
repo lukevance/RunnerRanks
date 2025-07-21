@@ -1,10 +1,10 @@
 import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ExternalLink, Info } from "lucide-react";
+import { ArrowLeft, ExternalLink, Info, Trophy, Users } from "lucide-react";
 import { Link } from "wouter";
 import type { Race } from "@shared/schema";
 import { Header } from "@/components/header";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatTime, getInitials, getAvatarGradient, calculatePace } from "@/lib/utils";
 
 export default function RaceDetails() {
   const { id } = useParams<{ id: string }>();
@@ -53,6 +53,151 @@ export default function RaceDetails() {
             </Link>
           </div>
         </main>
+      </div>
+    );
+  }
+
+  // Race Results Component
+  function RaceResultsSection({ raceId }: { raceId: number }) {
+    const { data: results = [], isLoading: resultsLoading } = useQuery({
+      queryKey: ['/api/races', raceId, 'results'],
+      queryFn: async () => {
+        const response = await fetch(`/api/races/${raceId}/results`);
+        if (!response.ok) throw new Error('Failed to fetch results');
+        return response.json();
+      },
+      enabled: !!raceId && !!race
+    });
+
+    if (resultsLoading) {
+      return (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 mb-8">
+          <div className="animate-pulse space-y-4">
+            <div className="h-6 bg-slate-200 rounded w-1/4"></div>
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-16 bg-slate-100 rounded"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
+          <h2 className="text-lg font-semibold text-slate-900">Race Results</h2>
+          <p className="text-sm text-slate-600 mt-1">
+            All finishers for {race?.name} ({results.length} total)
+          </p>
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Place
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Runner
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Time
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Gender Place
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Age Group Place
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-slate-200">
+              {results.slice(0, 20).map((result: any) => {
+                const initials = getInitials(result.runner.name);
+                const gradient = getAvatarGradient(result.runner.name);
+                const pace = calculatePace(result.finishTime, race?.distanceMiles || "0");
+
+                return (
+                  <tr 
+                    key={result.id}
+                    className="hover:bg-slate-50 transition-colors"
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        {result.overallPlace <= 3 ? (
+                          <div className="flex items-center">
+                            <Trophy className={`w-5 h-5 mr-2 ${
+                              result.overallPlace === 1 ? 'text-yellow-500' :
+                              result.overallPlace === 2 ? 'text-gray-400' :
+                              'text-amber-600'
+                            }`} />
+                            <span className="font-bold text-slate-900">{result.overallPlace}</span>
+                          </div>
+                        ) : (
+                          <span className="font-medium text-slate-900">{result.overallPlace}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+                          <span className="text-white font-semibold text-sm">{initials}</span>
+                        </div>
+                        <div className="ml-3">
+                          <Link 
+                            href={`/runner/${result.runner.id}`}
+                            className="text-sm font-medium text-slate-900 hover:text-performance-blue"
+                          >
+                            {result.runner.name}
+                          </Link>
+                          <div className="text-sm text-slate-500">
+                            {result.runner.gender} • Age {result.runner.age} • {result.runner.city}, {result.runner.state}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-lg font-bold text-slate-900">
+                        {formatTime(result.finishTime)}
+                      </div>
+                      <div className="text-sm text-slate-500">
+                        {pace}/mi pace
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                      {result.genderPlace || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                      {result.ageGroupPlace || '-'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {results.length > 20 && (
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 text-center">
+            <Link 
+              href={`/race/${raceId}/results`}
+              className="text-performance-blue hover:text-blue-700 font-medium"
+            >
+              View all {results.length} results →
+            </Link>
+          </div>
+        )}
+
+        {results.length === 0 && (
+          <div className="text-center py-12">
+            <Users className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-slate-900 mb-2">No results found</h3>
+            <p className="text-slate-500">This race doesn't have any results yet.</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -111,6 +256,9 @@ export default function RaceDetails() {
             <div className="text-sm text-slate-600">Average Time</div>
           </div>
         </div>
+
+        {/* Race Results */}
+        <RaceResultsSection raceId={raceId} />
 
         {/* Race Details */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">

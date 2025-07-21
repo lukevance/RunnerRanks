@@ -140,11 +140,12 @@ export function LeaderboardTable({ filters }: LeaderboardTableProps) {
                           <span className="text-white font-semibold text-sm">{initials}</span>
                         </div>
                         <div className="ml-3">
-                          <div className="text-sm font-medium text-slate-900">
+                          <div className="text-sm font-medium text-slate-900 hover:text-performance-blue cursor-pointer"
+                               onClick={() => setSelectedRunnerId(entry.runner.id)}>
                             {entry.runner.name}
                           </div>
                           <div className="text-sm text-slate-500">
-                            {entry.runner.gender} • {entry.runner.city}, {entry.runner.state}
+                            {entry.runner.gender} • Age {entry.runner.age} • {entry.runner.city}, {entry.runner.state}
                           </div>
                         </div>
                       </div>
@@ -202,7 +203,7 @@ export function LeaderboardTable({ filters }: LeaderboardTableProps) {
         
         <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
           <div className="text-sm text-slate-600">
-            Showing {entries.length} of {entries.length} runners
+            Showing {entries.length} runners
           </div>
           <div className="flex space-x-2">
             <button className="px-3 py-1 text-sm bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
