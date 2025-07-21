@@ -335,8 +335,83 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Navigation Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Link 
+            href="/leaderboard"
+            className="group block"
+          >
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-performance-blue/10 rounded-lg flex items-center justify-center">
+                  <Trophy className="text-performance-blue w-6 h-6" />
+                </div>
+                <div className="ml-4 flex-1">
+                  <div className="text-lg font-semibold text-slate-900 group-hover:text-performance-blue transition-colors">
+                    Full Leaderboard
+                  </div>
+                  <div className="text-sm text-slate-600">All times & filters</div>
+                </div>
+                <ChevronDown className="w-5 h-5 text-slate-400 rotate-[-90deg] group-hover:translate-x-1 transition-transform" />
+              </div>
+            </div>
+          </Link>
+
+          <Link 
+            href="/race-series"
+            className="group block"
+          >
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-amber-500/10 rounded-lg flex items-center justify-center">
+                  <Calendar className="text-amber-500 w-6 h-6" />
+                </div>
+                <div className="ml-4 flex-1">
+                  <div className="text-lg font-semibold text-slate-900 group-hover:text-amber-500 transition-colors">
+                    Race Series
+                  </div>
+                  <div className="text-sm text-slate-600">Multi-race competitions</div>
+                </div>
+                <ChevronDown className="w-5 h-5 text-slate-400 rotate-[-90deg] group-hover:translate-x-1 transition-transform" />
+              </div>
+            </div>
+          </Link>
+
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <div className="flex items-center">
+              <div className="w-12 h-12 bg-performance-blue/10 rounded-lg flex items-center justify-center">
+                <Trophy className="text-performance-blue w-6 h-6" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-slate-900">
+                  {totalRunners.toLocaleString()}
+                </div>
+                <div className="text-sm text-slate-600">Total Runners</div>
+              </div>
+            </div>
+          </div>
+          
+          <div 
+            className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setShowRacesModal(true)}
+          >
+            <div className="flex items-center">
+              <div className="w-12 h-12 bg-achievement-green/10 rounded-lg flex items-center justify-center">
+                <Calendar className="text-achievement-green w-6 h-6" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-slate-900">
+                  {uniqueRaces}
+                </div>
+                <div className="text-sm text-slate-600">Races This Year</div>
+                <div className="text-xs text-performance-blue mt-1">Click to view all</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <div className="flex items-center">
               <div className="w-12 h-12 bg-performance-blue/10 rounded-lg flex items-center justify-center">
@@ -361,24 +436,6 @@ export default function Home() {
                   {fastestTime}
                 </div>
                 <div className="text-sm text-slate-600">Fastest Time</div>
-              </div>
-            </div>
-          </div>
-          
-          <div 
-            className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setShowRacesModal(true)}
-          >
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-amber-500/10 rounded-lg flex items-center justify-center">
-                <Calendar className="text-amber-500 w-6 h-6" />
-              </div>
-              <div className="ml-4">
-                <div className="text-2xl font-bold text-slate-900">
-                  {uniqueRaces}
-                </div>
-                <div className="text-sm text-slate-600">Races This Year</div>
-                <div className="text-xs text-performance-blue mt-1">Click to view all</div>
               </div>
             </div>
           </div>
