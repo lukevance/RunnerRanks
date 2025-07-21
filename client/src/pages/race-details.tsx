@@ -93,24 +93,89 @@ export default function RaceDetails() {
           </p>
         </div>
         
-        <div className="overflow-x-auto">
+        {/* Mobile Layout */}
+        <div className="block md:hidden space-y-3 p-4">
+          {results.slice(0, 20).map((result: any) => {
+            const initials = getInitials(result.runner.name);
+            const gradient = getAvatarGradient(result.runner.name);
+            const pace = calculatePace(result.finishTime, parseFloat(race?.distanceMiles || "0"));
+
+            return (
+              <div key={result.id} className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex items-center">
+                      {result.overallPlace <= 3 ? (
+                        <div className="flex items-center">
+                          <Trophy className={`w-5 h-5 mr-2 ${
+                            result.overallPlace === 1 ? 'text-yellow-500' :
+                            result.overallPlace === 2 ? 'text-gray-400' :
+                            'text-amber-600'
+                          }`} />
+                          <span className="font-bold text-lg text-slate-900">#{result.overallPlace}</span>
+                        </div>
+                      ) : (
+                        <span className="font-semibold text-lg text-slate-900">#{result.overallPlace}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-slate-900">
+                      {formatTime(result.finishTime)}
+                    </div>
+                    <div className="text-sm text-slate-500">
+                      {pace}/mi pace
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center">
+                  <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+                    <span className="text-white font-semibold text-sm">{initials}</span>
+                  </div>
+                  <div className="ml-3 flex-1">
+                    <Link 
+                      href={`/runner/${result.runner.id}`}
+                      className="font-medium text-slate-900 hover:text-performance-blue"
+                    >
+                      {result.runner.name}
+                    </Link>
+                    <div className="text-sm text-slate-500">
+                      {result.runner.gender} • Age {result.runner.age}
+                    </div>
+                    {(result.genderPlace || result.ageGroupPlace) && (
+                      <div className="text-xs text-slate-400">
+                        {result.genderPlace && `${result.genderPlace} ${result.runner.gender}`}
+                        {result.genderPlace && result.ageGroupPlace && ' • '}
+                        {result.ageGroupPlace && `${result.ageGroupPlace} Age Group`}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop Layout */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Place
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Runner
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Time
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Gender Place
+                <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Gender
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Age Group Place
+                <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Age Group
                 </th>
               </tr>
             </thead>
@@ -118,18 +183,18 @@ export default function RaceDetails() {
               {results.slice(0, 20).map((result: any) => {
                 const initials = getInitials(result.runner.name);
                 const gradient = getAvatarGradient(result.runner.name);
-                const pace = calculatePace(result.finishTime, race?.distanceMiles || "0");
+                const pace = calculatePace(result.finishTime, parseFloat(race?.distanceMiles || "0"));
 
                 return (
                   <tr 
                     key={result.id}
                     className="hover:bg-slate-50 transition-colors"
                   >
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center">
                         {result.overallPlace <= 3 ? (
                           <div className="flex items-center">
-                            <Trophy className={`w-5 h-5 mr-2 ${
+                            <Trophy className={`w-4 h-4 mr-1 ${
                               result.overallPlace === 1 ? 'text-yellow-500' :
                               result.overallPlace === 2 ? 'text-gray-400' :
                               'text-amber-600'
@@ -141,36 +206,36 @@ export default function RaceDetails() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center`}>
-                          <span className="text-white font-semibold text-sm">{initials}</span>
+                        <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+                          <span className="text-white font-semibold text-xs">{initials}</span>
                         </div>
-                        <div className="ml-3">
+                        <div className="ml-2">
                           <Link 
                             href={`/runner/${result.runner.id}`}
                             className="text-sm font-medium text-slate-900 hover:text-performance-blue"
                           >
                             {result.runner.name}
                           </Link>
-                          <div className="text-sm text-slate-500">
-                            {result.runner.gender} • Age {result.runner.age} • {result.runner.city}, {result.runner.state}
+                          <div className="text-xs text-slate-500">
+                            {result.runner.gender} • {result.runner.age}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-lg font-bold text-slate-900">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-base font-bold text-slate-900">
                         {formatTime(result.finishTime)}
                       </div>
-                      <div className="text-sm text-slate-500">
-                        {pace}/mi pace
+                      <div className="text-xs text-slate-500">
+                        {pace}/mi
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-slate-900 text-center">
                       {result.genderPlace || '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-slate-900 text-center">
                       {result.ageGroupPlace || '-'}
                     </td>
                   </tr>
