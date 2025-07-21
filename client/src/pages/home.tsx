@@ -14,6 +14,7 @@ interface LeaderboardEntry {
     city?: string;
     state?: string;
     age?: number;
+    gender?: string;
   };
   race: {
     id: number;
@@ -54,7 +55,7 @@ function DistanceLeaderboard({ distance, label, distanceMiles }: DistanceLeaderb
     queryFn: async () => {
       const response = await fetch(`/api/leaderboard?distance=${encodeURIComponent(distance)}&limit=${showCount}`);
       if (!response.ok) throw new Error('Failed to fetch leaderboard');
-      return response.json() as LeaderboardEntry[];
+      return response.json();
     }
   });
 
@@ -117,7 +118,7 @@ function DistanceLeaderboard({ distance, label, distanceMiles }: DistanceLeaderb
                 </div>
               </div>
               <div className="col-span-4">
-                <Link href={`/runner-profile/${entry.runner.id}`} className="font-medium text-slate-900 hover:text-performance-blue">
+                <Link href={`/runner/${entry.runner.id}`} className="font-medium text-slate-900 hover:text-performance-blue">
                   {entry.runner.name}
                 </Link>
                 <div className="text-xs text-slate-500">
@@ -129,7 +130,7 @@ function DistanceLeaderboard({ distance, label, distanceMiles }: DistanceLeaderb
                 <div className="text-xs text-slate-500">{calculatePace(entry.result.finishTime, distanceMiles)} pace</div>
               </div>
               <div className="col-span-3">
-                <Link href={`/race-details/${entry.race.id}`} className="text-sm text-blue-600 hover:text-blue-800">
+                <Link href={`/race/${entry.race.id}`} className="text-sm text-blue-600 hover:text-blue-800">
                   {entry.race.name}
                 </Link>
                 <div className="text-xs text-slate-500">

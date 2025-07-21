@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import type { LeaderboardEntry } from "@shared/schema";
 import { formatTime, formatDate, getRankDisplay, getInitials, getAvatarGradient, calculatePace, getPerformanceLevel, isBostonQualifier, getWeatherIcon, getTemperatureColor } from "@/lib/utils";
 import { RunnerProfileModal } from "./runner-profile-modal";
@@ -160,7 +161,7 @@ export function LeaderboardTable({ filters }: LeaderboardTableProps) {
                       <Link 
                         href={`/race/${entry.race.id}/results`}
                         className="text-sm font-medium text-slate-900 hover:text-performance-blue transition-colors block"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
                       >
                         {entry.race.name}
                       </Link>
