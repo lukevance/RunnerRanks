@@ -83,7 +83,79 @@ export function LeaderboardTable({ filters }: LeaderboardTableProps) {
           </p>
         </div>
         
-        <div className="overflow-x-auto">
+        {/* Mobile Layout */}
+        <div className="block md:hidden space-y-4 p-4">
+          {entries.map((entry, index) => {
+            const rank = index + 1;
+            const rankDisplay = getRankDisplay(rank);
+            const initials = getInitials(entry.runner.name);
+            const gradient = getAvatarGradient(entry.runner.name);
+            const pace = calculatePace(entry.result.finishTime, parseFloat(entry.race.distanceMiles));
+            
+            return (
+              <div key={entry.id} className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+                {/* Place and Time */}
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex items-center">
+                    <div className={rankDisplay.className}>
+                      <span className={`text-lg font-bold ${rank === 1 ? 'text-amber-800' : 'text-slate-600'}`}>
+                        #{rank}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-slate-900">
+                      {formatTime(entry.result.finishTime)}
+                    </div>
+                    <div className="text-sm text-slate-500">
+                      {pace}/mi pace
+                    </div>
+                  </div>
+                </div>
+
+                {/* Runner Info */}
+                <div className="flex items-center mb-3">
+                  <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+                    <span className="text-white font-semibold">{initials}</span>
+                  </div>
+                  <div className="ml-3 flex-1">
+                    <div className="font-medium text-slate-900 hover:text-performance-blue cursor-pointer"
+                         onClick={() => setSelectedRunnerId(entry.runner.id)}>
+                      {entry.runner.name}
+                    </div>
+                    <div className="text-sm text-slate-500">
+                      {entry.runner.gender} • Age {entry.runner.age} • {entry.runner.city}, {entry.runner.state}
+                    </div>
+                    {entry.runner.age && (
+                      <div className="text-xs text-slate-400">
+                        {entry.runner.age < 20 ? 'U20' : 
+                         entry.runner.age < 30 ? '20-29' :
+                         entry.runner.age < 40 ? '30-39' :
+                         entry.runner.age < 50 ? '40-49' :
+                         entry.runner.age < 60 ? '50-59' :
+                         entry.runner.age < 70 ? '60-69' : '70+'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Race Info */}
+                <div className="border-t border-slate-100 pt-3">
+                  <div className="font-medium text-slate-900 hover:text-performance-blue cursor-pointer text-sm mb-1"
+                       onClick={() => setSelectedRaceId(entry.race.id)}>
+                    {entry.race.name}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {entry.race.distanceMiles} mi • {formatDate(entry.race.date)}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop Layout */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>

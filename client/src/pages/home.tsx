@@ -99,7 +99,7 @@ function DistanceLeaderboard({ distance, label, distanceMiles }: DistanceLeaderb
       </div>
       
       <div className="space-y-3">
-        {entries.map((entry, index) => {
+        {entries.map((entry: LeaderboardEntry, index: number) => {
           const getAgeGroup = (age: number) => {
             if (age < 20) return 'U20';
             if (age < 30) return '20-29';
@@ -111,7 +111,39 @@ function DistanceLeaderboard({ distance, label, distanceMiles }: DistanceLeaderb
           };
 
           return (
-            <div key={entry.id} className="grid grid-cols-12 gap-2 py-3 border-b border-slate-100 last:border-b-0 items-center">
+            <>
+            {/* Mobile Layout */}
+            <div key={entry.id} className="block sm:hidden bg-white border border-slate-200 rounded-lg p-4 mb-3">
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-performance-blue/10 rounded-full flex items-center justify-center text-sm font-medium text-performance-blue">
+                    {index + 1}
+                  </div>
+                  <div>
+                    <Link href={`/runner/${entry.runner.id}`} className="font-medium text-slate-900 hover:text-performance-blue">
+                      {entry.runner.name}
+                    </Link>
+                    <div className="text-xs text-slate-500">
+                      {entry.runner.age ? `${entry.runner.age} ${entry.runner.gender || ''}` : entry.runner.gender || 'N/A'}
+                      {entry.runner.age && ` • ${getAgeGroup(entry.runner.age)}`}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-medium text-slate-900">{entry.result.finishTime}</div>
+                  <div className="text-xs text-slate-500">{calculatePace(entry.result.finishTime, distanceMiles)} pace</div>
+                </div>
+              </div>
+              <div className="flex justify-between text-xs text-slate-500">
+                <Link href={`/race/${entry.race.id}`} className="text-blue-600 hover:text-blue-800 max-w-[60%] truncate">
+                  {entry.race.name}
+                </Link>
+                <div>{new Date(entry.race.date).toLocaleDateString()}</div>
+              </div>
+            </div>
+
+            {/* Desktop Layout */}
+            <div key={`desktop-${entry.id}`} className="hidden sm:grid grid-cols-12 gap-2 py-3 border-b border-slate-100 last:border-b-0 items-center">
               <div className="col-span-1">
                 <div className="w-8 h-8 bg-performance-blue/10 rounded-full flex items-center justify-center text-sm font-medium text-performance-blue">
                   {index + 1}
@@ -148,6 +180,7 @@ function DistanceLeaderboard({ distance, label, distanceMiles }: DistanceLeaderb
                 )}
               </div>
             </div>
+            </>
           );
         })}
       </div>
