@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Trophy, Clock, Calendar, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { Trophy, Clock, Calendar, ChevronDown, ChevronUp, ExternalLink, MoreHorizontal } from "lucide-react";
 import { Header } from "@/components/header";
 import { RacesListModal } from "@/components/races-list-modal";
 import { Link } from "wouter";
@@ -111,9 +111,9 @@ function DistanceLeaderboard({ distance, label, distanceMiles }: DistanceLeaderb
           };
 
           return (
-            <>
+            <div key={entry.id}>
             {/* Mobile Layout */}
-            <div key={entry.id} className="block sm:hidden bg-white border border-slate-200 rounded-lg p-4 mb-3">
+            <div className="block sm:hidden bg-white border border-slate-200 rounded-lg p-4 mb-3">
               <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 bg-performance-blue/10 rounded-full flex items-center justify-center text-sm font-medium text-performance-blue">
@@ -180,7 +180,7 @@ function DistanceLeaderboard({ distance, label, distanceMiles }: DistanceLeaderb
                 )}
               </div>
             </div>
-            </>
+            </div>
           );
         })}
       </div>
@@ -212,6 +212,7 @@ function DistanceLeaderboard({ distance, label, distanceMiles }: DistanceLeaderb
 export default function Home() {
   const [selectedDistance, setSelectedDistance] = useState('marathon');
   const [showRacesModal, setShowRacesModal] = useState(false);
+  const [showMoreTabs, setShowMoreTabs] = useState(false);
 
   // Get overall stats
   const { data: stats } = useQuery({
@@ -247,7 +248,68 @@ export default function Home() {
         {/* Distance Tabs */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-8">
           <div className="border-b border-slate-200">
-            <nav className="flex space-x-8 px-6" aria-label="Distance tabs">
+            {/* Mobile Navigation */}
+            <nav className="block sm:hidden px-4 py-2" aria-label="Distance tabs">
+              <div className="flex items-center space-x-2">
+                {/* First two tabs always visible */}
+                {DISTANCES.slice(0, 2).map((distance) => (
+                  <button
+                    key={distance.key}
+                    onClick={() => setSelectedDistance(distance.key)}
+                    className={`py-2 px-3 rounded-lg font-medium text-sm transition-colors ${
+                      selectedDistance === distance.key
+                        ? 'bg-performance-blue text-white'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {distance.label}
+                  </button>
+                ))}
+                
+                {/* More dropdown */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowMoreTabs(!showMoreTabs)}
+                    className={`py-2 px-3 rounded-lg font-medium text-sm transition-colors flex items-center space-x-1 ${
+                      DISTANCES.slice(2).some(d => d.key === selectedDistance)
+                        ? 'bg-performance-blue text-white'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {DISTANCES.slice(2).some(d => d.key === selectedDistance) ? (
+                      <span>{DISTANCES.find(d => d.key === selectedDistance)?.label}</span>
+                    ) : (
+                      <span>More</span>
+                    )}
+                    <ChevronDown className={`w-4 h-4 transition-transform ${showMoreTabs ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {showMoreTabs && (
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[120px]">
+                      {DISTANCES.slice(2).map((distance) => (
+                        <button
+                          key={distance.key}
+                          onClick={() => {
+                            setSelectedDistance(distance.key);
+                            setShowMoreTabs(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 first:rounded-t-lg last:rounded-b-lg ${
+                            selectedDistance === distance.key
+                              ? 'bg-performance-blue/10 text-performance-blue font-medium'
+                              : 'text-slate-700'
+                          }`}
+                        >
+                          {distance.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </nav>
+
+            {/* Desktop Navigation */}
+            <nav className="hidden sm:flex space-x-8 px-6" aria-label="Distance tabs">
               {DISTANCES.map((distance) => (
                 <button
                   key={distance.key}
