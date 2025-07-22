@@ -47,23 +47,73 @@ export class RaceRosterProvider {
     return data;
   }
 
+  async parseHtmlForApiIds(htmlUrl: string): Promise<{ eventId: string; subEventId: string } | null> {
+    try {
+      console.log(`Parsing RaceRoster HTML page: ${htmlUrl}`);
+      const response = await fetch(htmlUrl);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch HTML page: ${response.status}`);
+      }
+      
+      const html = await response.text();
+      
+      // Look for API calls in the HTML that contain the event and sub-event IDs
+      // RaceRoster typically embeds these in JavaScript API calls
+      const apiPatterns = [
+        /result-events\/(\d+)\/sub-events\/(\d+)\/results/g,
+        /eventId['":\s]*(\d+)['"]*.*?subEventId['":\s]*(\d+)/g,
+        /event_id['":\s]*(\d+)['"]*.*?sub_event_id['":\s]*(\d+)/g
+      ];
+      
+      for (const pattern of apiPatterns) {
+        let match;
+        while ((match = pattern.exec(html)) !== null) {
+          console.log(`Found API IDs in HTML: eventId=${match[1]}, subEventId=${match[2]}`);
+          return { eventId: match[1], subEventId: match[2] };
+        }
+      }
+      
+      console.log('Could not find API IDs in HTML page');
+      return null;
+    } catch (error) {
+      console.error('Error parsing RaceRoster HTML:', error);
+      return null;
+    }
+  }
+
   parseRaceRosterUrl(url: string): { eventId: string; subEventId: string } | null {
-    // Example URL: https://results.raceroster.com/en-US/series/16075/results/412345
-    // Or: https://results.raceroster.com/results/412345
+    // Example URLs:
+    // HTML: https://results.raceroster.com/v2/en-US/results/kcr4axw63nrc9dhn/results
+    // API: https://results.raceroster.com/v2/api/result-events/84556/sub-events/222034/results
+    // Legacy: https://results.raceroster.com/en-US/series/16075/results/412345
+    // Legacy: https://results.raceroster.com/results/412345
     
     const patterns = [
+      // New v2 API format
+      /results\.raceroster\.com\/v2\/api\/result-events\/(\d+)\/sub-events\/(\d+)\/results/,
+      // New v2 HTML format - need to extract from page
+      /results\.raceroster\.com\/v2\/.*\/results\/([a-zA-Z0-9]+)\/results/,
+      // Legacy formats
       /results\.raceroster\.com\/.*\/results\/(\d+)/,
       /results\.raceroster\.com\/.*\/series\/(\d+)\/results\/(\d+)/
     ];
     
-    for (const pattern of patterns) {
+    for (let i = 0; i < patterns.length; i++) {
+      const pattern = patterns[i];
       const match = url.match(pattern);
       if (match) {
-        if (match.length === 2) {
-          // Single result ID - use as both event and sub-event
+        if (i === 0) {
+          // v2 API format: extract event and sub-event IDs directly
+          return { eventId: match[1], subEventId: match[2] };
+        } else if (i === 1) {
+          // v2 HTML format: mark for HTML parsing
+          return { eventId: 'HTML_PARSE', subEventId: match[1] };
+        } else if (match.length === 2) {
+          // Legacy single result ID - use as both event and sub-event
           return { eventId: match[1], subEventId: match[1] };
         } else if (match.length === 3) {
-          // Series and result ID
+          // Legacy series and result ID
           return { eventId: match[1], subEventId: match[2] };
         }
       }

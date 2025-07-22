@@ -115,6 +115,7 @@ interface RunSignupEvent {
 export function ImportDemo() {
   const [importUrl, setImportUrl] = useState("");
   const [importType, setImportType] = useState<"url" | "csv" | "api">("url");
+  const [provider, setProvider] = useState<"auto" | "runsignup" | "raceroster">("auto");
   const [csvData, setCsvData] = useState("");
   const [raceId, setRaceId] = useState("");
   const [eventId, setEventId] = useState("");
@@ -170,21 +171,31 @@ export function ImportDemo() {
           throw new Error('Please enter a race results URL');
         }
         
-        // Determine provider from URL
+        // Determine provider from selection or URL
         const url = importUrl.toLowerCase();
-        let provider = 'unknown';
+        let selectedProvider = provider;
         
-        if (url.includes('runsignup.com')) {
-          provider = 'runsignup';
+        if (selectedProvider === 'auto') {
+          if (url.includes('runsignup.com')) {
+            selectedProvider = 'runsignup';
+          } else if (url.includes('raceroster.com')) {
+            selectedProvider = 'raceroster';
+          } else {
+            throw new Error('Could not detect provider from URL. Please select RunSignup or RaceRoster manually.');
+          }
+        }
+        
+        if (selectedProvider === 'runsignup') {
           endpoint = '/api/import/runsignup';
-        } else if (url.includes('raceroster.com')) {
-          provider = 'raceroster';
+        } else if (selectedProvider === 'raceroster') {
           endpoint = '/api/import/raceroster';
+        } else {
+          throw new Error('Unsupported provider');
         }
         
         body = {
           url: importUrl,
-          sourceProvider: provider
+          sourceProvider: selectedProvider
         };
       } else if (importType === "api") {
         if (!raceId.trim()) {
@@ -381,21 +392,67 @@ export function ImportDemo() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
+                Provider Selection
+              </label>
+              <select
+                value={provider}
+                onChange={(e) => setProvider(e.target.value as "auto" | "runsignup" | "raceroster")}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-performance-blue focus:border-performance-blue mb-3"
+              >
+                <option value="auto">Auto-detect from URL</option>
+                <option value="runsignup">RunSignup (HTML parsing)</option>
+                <option value="raceroster">RaceRoster (API or HTML parsing)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
                 Race Results URL
               </label>
               <input
                 type="url"
                 value={importUrl}
                 onChange={(e) => setImportUrl(e.target.value)}
-                placeholder="https://runsignup.com/Race/Results/12345 or https://raceroster.com/events/12345/results"
+                placeholder="https://runsignup.com/Race/Results/12345 or https://raceroster.com/v2/api/result-events/84556/sub-events/222034/results"
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-performance-blue focus:border-performance-blue"
               />
             </div>
+            
+            {/* Provider-specific guidance */}
+            {provider === "raceroster" && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start space-x-2">
+                  <CheckCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium mb-1">RaceRoster URL Support</p>
+                    <p className="mb-2">Two URL formats are supported:</p>
+                    <ul className="list-disc list-inside space-y-1 ml-4">
+                      <li><strong>API URLs:</strong> https://results.raceroster.com/v2/api/result-events/84556/sub-events/222034/results</li>
+                      <li><strong>HTML URLs:</strong> https://results.raceroster.com/v2/en-US/results/kcr4axw63nrc9dhn/results</li>
+                    </ul>
+                    <p className="mt-2">HTML URLs will be automatically parsed to extract the underlying API endpoints.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {provider === "runsignup" && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="flex items-start space-x-2">
+                  <CheckCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+                  <div className="text-sm text-amber-800">
+                    <p className="font-medium mb-1">RunSignup HTML Parsing</p>
+                    <p>Supports standard race results URLs like: https://runsignup.com/Race/Results/169856</p>
+                    <p className="mt-1">For authenticated API access with better reliability, use the "API Import" option instead.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="text-sm text-slate-600">
               <p className="mb-1">Supported providers:</p>
               <ul className="list-disc list-inside space-y-1">
-                <li>RunSignup.com race results pages</li>
-                <li>RaceRoster.com event results</li>
+                <li>RunSignup.com race results pages (HTML parsing)</li>
+                <li>RaceRoster.com v2 API endpoints and HTML results pages</li>
                 <li>Direct CSV export URLs</li>
               </ul>
             </div>

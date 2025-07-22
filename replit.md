@@ -41,6 +41,16 @@ Built with:
 
 ## Recent Changes
 
+### July 22, 2025 - Enhanced RaceRoster Import & Provider Selection
+✓ Updated RaceRoster provider to support new v2 API URL format: results.raceroster.com/v2/api/result-events/{eventId}/sub-events/{subEventId}/results
+✓ Added HTML parsing capability for v2 HTML URLs: results.raceroster.com/v2/en-US/results/{code}/results  
+✓ Enhanced import form with provider selection dropdown (Auto-detect, RunSignup, RaceRoster)
+✓ Added intelligent URL format detection and parsing for both API and HTML endpoints
+✓ Implemented background HTML parsing to extract API IDs from JavaScript-loaded pages
+✓ Added provider-specific guidance and help text in the import interface
+✓ Fixed TypeScript errors and improved error handling for unsupported URL formats
+✓ Maintained backward compatibility with existing URL parsing patterns
+
 ### July 20, 2025 - Database Management & Race Deletion System
 ✓ Added comprehensive race deletion functionality with cascade delete for results
 ✓ Created RaceManager component with race listing, details, and delete capabilities

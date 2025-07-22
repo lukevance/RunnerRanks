@@ -1083,8 +1083,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!parsed) {
           return res.status(400).json({ error: "Invalid RaceRoster URL format" });
         }
-        finalEventId = parsed.eventId;
-        finalSubEventId = parsed.subEventId;
+        
+        // Handle HTML parsing case
+        if (parsed.eventId === 'HTML_PARSE') {
+          console.log(`Parsing HTML page to extract API IDs: ${url}`);
+          const htmlParsed = await raceRosterProvider.parseHtmlForApiIds(url);
+          if (!htmlParsed) {
+            return res.status(400).json({ error: "Could not extract event IDs from RaceRoster HTML page" });
+          }
+          finalEventId = htmlParsed.eventId;
+          finalSubEventId = htmlParsed.subEventId;
+        } else {
+          finalEventId = parsed.eventId;
+          finalSubEventId = parsed.subEventId;
+        }
       }
       
       if (!finalEventId || !finalSubEventId) {
