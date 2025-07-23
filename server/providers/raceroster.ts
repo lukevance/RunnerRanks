@@ -1,17 +1,28 @@
 export interface RaceRosterResult {
+  id?: string;
   name: string;
   first_name?: string;
   last_name?: string;
-  age: number;
-  gender: string;
-  city: string;
-  state: string;
-  finish_time: string;
+  age?: number;
+  gender?: string;
+  city?: string;
+  state?: string;
+  fromCity?: string;
+  fromProvState?: string;
+  finish_time?: string;
   time?: string;
-  overall_place: number;
+  gunTime?: string;
+  overall_place?: number;
+  overallPlace?: number;
   place?: number;
   gender_place?: number;
+  divisionPlace?: string;
+  division?: string;
   age_group_place?: number;
+  bib?: string;
+  overallPace?: string;
+  initials?: string;
+  advertising?: string;
 }
 
 export interface RaceRosterEventInfo {

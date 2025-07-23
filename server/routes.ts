@@ -1167,21 +1167,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const result of data.results) {
         try {
-          // Extract runner information
+          // Extract runner information with RaceRoster field mapping
           const runnerName = result.name || `${result.first_name || ''} ${result.last_name || ''}`.trim();
-          const finishTime = result.finish_time || result.time || '';
+          const finishTime = result.gunTime || result.finish_time || result.time || '';
           
           if (!runnerName || !finishTime) {
-            importResults.errors.push(`Skipping result with missing name or time`);
+            importResults.errors.push(`Skipping result with missing name or time: name="${runnerName}", time="${finishTime}"`);
             continue;
           }
+
+          // Parse location from RaceRoster format
+          const city = result.fromCity || result.city || '';
+          const state = result.fromProvState || result.state || '';
 
           const rawRunnerData: RawRunnerData = {
             name: runnerName,
             age: result.age || 0,
             gender: result.gender || 'U',
-            city: result.city || '',
-            state: result.state || '',
+            city: city,
+            state: state,
             finishTime: finishTime
           };
 
@@ -1191,11 +1195,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             runnerId: runner.id,
             raceId: race.id,
             finishTime: finishTime,
-            overallPlace: result.overall_place || result.place || 0,
-            genderPlace: result.gender_place || null,
+            overallPlace: result.overallPlace || result.overall_place || result.place || 0,
+            genderPlace: result.divisionPlace || result.gender_place || null,
             ageGroupPlace: result.age_group_place || null,
             sourceProvider: "raceroster",
             rawRunnerName: rawRunnerData.name,
+            rawLocation: `${city}, ${state}`.trim().replace(/,$/, ''),
+            rawAge: result.age || null,
             matchingScore: matchScore,
             needsReview: needsReview
           });
