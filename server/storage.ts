@@ -313,12 +313,64 @@ export class DatabaseStorage implements IStorage {
       query = query.where(and(...conditions));
     }
 
-    const finalQuery = query
-      .orderBy(asc(sql`EXTRACT(EPOCH FROM ${results.finishTime}::interval)`))
-      .limit(filters?.limit || 100)
-      .offset(filters?.offset || 0);
+    console.log(`[Leaderboard] Query filters: distance=${filters?.distance}, gender=${filters?.gender}, search="${filters?.search}"`);
 
-    return await finalQuery;
+    // Get all results, then sort and deduplicate in JavaScript for now
+    const allResults = await query;
+    
+    console.log(`[Leaderboard] Raw query returned ${allResults.length} results`);
+
+    // Convert finish times to seconds for sorting and deduplication
+    const resultsWithSeconds = allResults.map(entry => {
+      const timeMatch = entry.result.finishTime.match(/^(\d+):(\d{2}):(\d{2})(\.\d+)?$/);
+      let totalSeconds = 0;
+      
+      if (timeMatch) {
+        const hours = parseInt(timeMatch[1]);
+        const minutes = parseInt(timeMatch[2]);
+        const seconds = parseFloat(timeMatch[3] + (timeMatch[4] || ''));
+        totalSeconds = hours * 3600 + minutes * 60 + seconds;
+      }
+      
+      return {
+        ...entry,
+        totalSeconds
+      };
+    });
+
+    // Sort by fastest time first (ascending seconds)
+    resultsWithSeconds.sort((a, b) => a.totalSeconds - b.totalSeconds);
+
+    // Keep only the best result per runner for each distance
+    const bestResultsMap = new Map<string, typeof resultsWithSeconds[0]>();
+    
+    for (const entry of resultsWithSeconds) {
+      const key = `${entry.runner.id}-${entry.race.distance}`;
+      const existing = bestResultsMap.get(key);
+      
+      if (!existing || entry.totalSeconds < existing.totalSeconds) {
+        bestResultsMap.set(key, entry);
+      }
+    }
+
+    // Convert back to array and apply pagination
+    const deduplicatedResults = Array.from(bestResultsMap.values());
+    deduplicatedResults.sort((a, b) => a.totalSeconds - b.totalSeconds);
+
+    const limit = filters?.limit || 100;
+    const offset = filters?.offset || 0;
+    const finalResults = deduplicatedResults.slice(offset, offset + limit);
+
+    console.log(`[Leaderboard] After deduplication: ${deduplicatedResults.length} unique results`);
+    console.log(`[Leaderboard] Returning ${finalResults.length} results (limit: ${limit}, offset: ${offset})`);
+    
+    if (finalResults.length > 0) {
+      console.log(`[Leaderboard] First result: ${finalResults[0].runner.name} - ${finalResults[0].result.finishTime} (${finalResults[0].totalSeconds}s) (${finalResults[0].race.name})`);
+      console.log(`[Leaderboard] Last result: ${finalResults[finalResults.length - 1].runner.name} - ${finalResults[finalResults.length - 1].result.finishTime} (${finalResults[finalResults.length - 1].totalSeconds}s)`);
+    }
+
+    // Remove the totalSeconds property before returning
+    return finalResults.map(({ totalSeconds, ...entry }) => entry);
   }
 
   async getRunnerWithStats(id: number): Promise<RunnerWithStats | undefined> {
