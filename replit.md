@@ -41,7 +41,19 @@ Built with:
 
 ## Recent Changes
 
-### July 22, 2025 - Enhanced RaceRoster Import & Provider Selection
+### July 23, 2025 - Complete RaceRoster Import System with Pagination & Distance Detection
+✓ Fixed RaceRoster field mapping to correctly parse gunTime, fromCity, fromProvState, and overallPlace fields
+✓ Implemented race metadata API call to fetch accurate distance and distanceUnit information
+✓ Added comprehensive distance detection with unit conversion (km to miles) and 15k race support
+✓ Implemented full pagination support for RaceRoster results API (250 results per page)
+✓ Enhanced distance normalization logic to handle numeric distances with proper unit conversion
+✓ Added fallback text-based distance detection for cases where numeric parsing fails
+✓ Created getEventInfo method to fetch race metadata before importing results
+✓ Fixed all TypeScript interface mappings for RaceRoster API response structure
+✓ Comprehensive logging for distance parsing and pagination progress tracking
+✓ Now imports complete result sets instead of only first 50 results from RaceRoster events
+
+### July 22, 2025 - Enhanced RaceRoster Import & Provider Selection  
 ✓ Updated RaceRoster provider to support new v2 API URL format: results.raceroster.com/v2/api/result-events/{eventId}/sub-events/{subEventId}/results
 ✓ Added HTML parsing capability for v2 HTML URLs: results.raceroster.com/v2/en-US/results/{code}/results  
 ✓ Enhanced import form with provider selection dropdown (Auto-detect, RunSignup, RaceRoster)

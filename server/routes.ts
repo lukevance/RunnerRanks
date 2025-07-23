@@ -1118,27 +1118,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const raceInfo = data.event_info || {};
       const defaultRaceName = raceName || raceInfo.name || `RaceRoster Event ${finalEventId}`;
       const raceDate = raceInfo.date || new Date().toISOString().split('T')[0];
-      const distance = raceInfo.distance || 'marathon';
       
-      // Normalize distance
-      const normalizedDistance = distance.toLowerCase().includes('marathon') && !distance.toLowerCase().includes('half') 
-        ? 'marathon' 
-        : distance.toLowerCase().includes('half') 
-        ? 'half-marathon'
-        : distance.toLowerCase().includes('10k')
-        ? '10k'
-        : distance.toLowerCase().includes('5k')
-        ? '5k'
-        : distance.toLowerCase().includes('10') && distance.toLowerCase().includes('mile')
-        ? '10-mile'
-        : 'other';
-
-      const distanceMiles = normalizedDistance === 'marathon' ? '26.2' 
-        : normalizedDistance === 'half-marathon' ? '13.1'
-        : normalizedDistance === '10k' ? '6.2'
-        : normalizedDistance === '5k' ? '3.1'
-        : normalizedDistance === '10-mile' ? '10.0'
-        : '0';
+      // Parse distance with unit conversion
+      let distance = raceInfo.distance || 'unknown';
+      const distanceUnit = raceInfo.distanceUnit || 'miles';
+      let distanceInMiles = 0;
+      
+      if (distance && distance !== 'unknown') {
+        const distanceNum = parseFloat(distance);
+        if (!isNaN(distanceNum)) {
+          // Convert to miles if needed
+          if (distanceUnit.toLowerCase().includes('km') || distanceUnit.toLowerCase().includes('kilometer')) {
+            distanceInMiles = distanceNum * 0.621371; // km to miles
+          } else {
+            distanceInMiles = distanceNum; // assume miles
+          }
+        }
+      }
+      
+      // Normalize distance based on actual distance in miles
+      let normalizedDistance = 'other';
+      let distanceMiles = '0';
+      
+      if (distanceInMiles > 0) {
+        if (distanceInMiles >= 26 && distanceInMiles <= 26.5) {
+          normalizedDistance = 'marathon';
+          distanceMiles = '26.2';
+        } else if (distanceInMiles >= 13 && distanceInMiles <= 13.5) {
+          normalizedDistance = 'half-marathon';
+          distanceMiles = '13.1';
+        } else if (distanceInMiles >= 9.5 && distanceInMiles <= 10.5) {
+          normalizedDistance = '10-mile';
+          distanceMiles = '10.0';
+        } else if (distanceInMiles >= 6 && distanceInMiles <= 6.5) {
+          normalizedDistance = '10k';
+          distanceMiles = '6.2';
+        } else if (distanceInMiles >= 3 && distanceInMiles <= 3.5) {
+          normalizedDistance = '5k';
+          distanceMiles = '3.1';
+        } else if (distanceInMiles >= 9 && distanceInMiles <= 10) {
+          // 15k = 9.32 miles
+          normalizedDistance = '15k';
+          distanceMiles = distanceInMiles.toFixed(1);
+        } else {
+          normalizedDistance = 'other';
+          distanceMiles = distanceInMiles.toFixed(1);
+        }
+      }
+      
+      console.log(`[RaceRoster] Distance parsing: ${distance} ${distanceUnit} = ${distanceInMiles} miles (${normalizedDistance})`);
+      
+      // Fallback to text-based detection if no numeric distance
+      if (normalizedDistance === 'other' && distance && distance !== 'unknown') {
+        const distanceText = distance.toLowerCase();
+        if (distanceText.includes('marathon') && !distanceText.includes('half')) {
+          normalizedDistance = 'marathon';
+          distanceMiles = '26.2';
+        } else if (distanceText.includes('half') || distanceText.includes('21k')) {
+          normalizedDistance = 'half-marathon';
+          distanceMiles = '13.1';
+        } else if (distanceText.includes('10k')) {
+          normalizedDistance = '10k';
+          distanceMiles = '6.2';
+        } else if (distanceText.includes('5k')) {
+          normalizedDistance = '5k';
+          distanceMiles = '3.1';
+        } else if (distanceText.includes('15k')) {
+          normalizedDistance = '15k';
+          distanceMiles = '9.3';
+        } else if (distanceText.includes('10') && distanceText.includes('mile')) {
+          normalizedDistance = '10-mile';
+          distanceMiles = '10.0';
+        }
+      }
 
       // Create race record
       const race = await storage.createRace({

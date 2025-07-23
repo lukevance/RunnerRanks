@@ -29,6 +29,7 @@ export interface RaceRosterEventInfo {
   name: string;
   date: string;
   distance: string;
+  distanceUnit?: string;
   city?: string;
   state?: string;
   start_time?: string;
@@ -40,41 +41,94 @@ export interface RaceRosterApiResponse {
 }
 
 export class RaceRosterProvider {
+  async getEventInfo(eventId: string, subEventId: string): Promise<RaceRosterEventInfo | null> {
+    const metadataUrl = `https://results.raceroster.com/v2/api/result-events/${eventId}/sub-events/${subEventId}`;
+    
+    try {
+      console.log(`[RaceRoster] Fetching race metadata: ${metadataUrl}`);
+      const response = await fetch(metadataUrl);
+      
+      if (!response.ok) {
+        console.warn(`[RaceRoster] Metadata API error: ${response.status} ${response.statusText}`);
+        return null;
+      }
+      
+      const data = await response.json();
+      console.log(`[RaceRoster] Metadata response:`, JSON.stringify(data).substring(0, 300));
+      
+      return {
+        name: data.name || data.title || `Event ${eventId}`,
+        date: data.date || new Date().toISOString().split('T')[0],
+        distance: data.distance || 'unknown',
+        distanceUnit: data.distanceUnit || 'miles',
+        city: data.city || '',
+        state: data.state || '',
+        start_time: data.start_time || data.startTime || ''
+      };
+    } catch (error) {
+      console.error(`[RaceRoster] Error fetching metadata:`, error);
+      return null;
+    }
+  }
+
   async getResults(eventId: string, subEventId: string): Promise<RaceRosterApiResponse> {
-    const apiUrl = `https://results.raceroster.com/v2/api/result-events/${eventId}/sub-events/${subEventId}/results`;
+    // First get race metadata for accurate distance info
+    const eventInfo = await this.getEventInfo(eventId, subEventId);
     
-    console.log(`[RaceRoster] Fetching: ${apiUrl}`);
-    const response = await fetch(apiUrl);
+    // Fetch all results with pagination
+    const allResults = [];
+    let start = 0;
+    const limit = 250;
+    let hasMore = true;
     
-    if (!response.ok) {
-      throw new Error(`RaceRoster API error: ${response.status} ${response.statusText}`);
+    while (hasMore) {
+      const apiUrl = `https://results.raceroster.com/v2/api/result-events/${eventId}/sub-events/${subEventId}/results?start=${start}&limit=${limit}`;
+      
+      console.log(`[RaceRoster] Fetching page: ${apiUrl}`);
+      const response = await fetch(apiUrl);
+      
+      if (!response.ok) {
+        throw new Error(`RaceRoster API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Check different possible response structures
+      let results = [];
+      if (data.results && Array.isArray(data.results)) {
+        results = data.results;
+      } else if (data.data && Array.isArray(data.data)) {
+        results = data.data;
+      } else if (Array.isArray(data)) {
+        results = data;
+      } else if (data.participants && Array.isArray(data.participants)) {
+        results = data.participants;
+      }
+      
+      if (results.length === 0) {
+        hasMore = false;
+      } else {
+        allResults.push(...results);
+        start += limit;
+        
+        // If we got fewer results than the limit, we've reached the end
+        if (results.length < limit) {
+          hasMore = false;
+        }
+        
+        console.log(`[RaceRoster] Fetched ${results.length} results (total: ${allResults.length})`);
+      }
     }
     
-    const data = await response.json();
-    console.log(`[RaceRoster] Response structure:`, Object.keys(data));
-    console.log(`[RaceRoster] Sample data:`, JSON.stringify(data).substring(0, 500));
-    
-    // Check different possible response structures
-    let results = [];
-    if (data.results && Array.isArray(data.results)) {
-      results = data.results;
-    } else if (data.data && Array.isArray(data.data)) {
-      results = data.data;
-    } else if (Array.isArray(data)) {
-      results = data;
-    } else if (data.participants && Array.isArray(data.participants)) {
-      results = data.participants;
-    }
-    
-    if (results.length === 0) {
-      console.log(`[RaceRoster] No results found. Full response:`, JSON.stringify(data, null, 2));
+    if (allResults.length === 0) {
+      console.log(`[RaceRoster] No results found in any pages`);
       throw new Error('No results found in RaceRoster response');
     }
     
-    console.log(`[RaceRoster] Found ${results.length} results`);
+    console.log(`[RaceRoster] Total results fetched: ${allResults.length}`);
     return {
-      results,
-      event_info: data.event_info || data.event || data.race_info
+      results: allResults,
+      event_info: eventInfo || undefined
     };
   }
 
