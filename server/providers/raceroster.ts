@@ -32,6 +32,7 @@ export class RaceRosterProvider {
   async getResults(eventId: string, subEventId: string): Promise<RaceRosterApiResponse> {
     const apiUrl = `https://results.raceroster.com/v2/api/result-events/${eventId}/sub-events/${subEventId}/results`;
     
+    console.log(`[RaceRoster] Fetching: ${apiUrl}`);
     const response = await fetch(apiUrl);
     
     if (!response.ok) {
@@ -39,12 +40,31 @@ export class RaceRosterProvider {
     }
     
     const data = await response.json();
+    console.log(`[RaceRoster] Response structure:`, Object.keys(data));
+    console.log(`[RaceRoster] Sample data:`, JSON.stringify(data).substring(0, 500));
     
-    if (!data.results || !Array.isArray(data.results)) {
+    // Check different possible response structures
+    let results = [];
+    if (data.results && Array.isArray(data.results)) {
+      results = data.results;
+    } else if (data.data && Array.isArray(data.data)) {
+      results = data.data;
+    } else if (Array.isArray(data)) {
+      results = data;
+    } else if (data.participants && Array.isArray(data.participants)) {
+      results = data.participants;
+    }
+    
+    if (results.length === 0) {
+      console.log(`[RaceRoster] No results found. Full response:`, JSON.stringify(data, null, 2));
       throw new Error('No results found in RaceRoster response');
     }
     
-    return data;
+    console.log(`[RaceRoster] Found ${results.length} results`);
+    return {
+      results,
+      event_info: data.event_info || data.event || data.race_info
+    };
   }
 
   async parseHtmlForApiIds(htmlUrl: string): Promise<{ eventId: string; subEventId: string } | null> {
@@ -63,7 +83,10 @@ export class RaceRosterProvider {
       const apiPatterns = [
         /result-events\/(\d+)\/sub-events\/(\d+)\/results/g,
         /eventId['":\s]*(\d+)['"]*.*?subEventId['":\s]*(\d+)/g,
-        /event_id['":\s]*(\d+)['"]*.*?sub_event_id['":\s]*(\d+)/g
+        /event_id['":\s]*(\d+)['"]*.*?sub_event_id['":\s]*(\d+)/g,
+        /"eventId"\s*:\s*(\d+).*?"subEventId"\s*:\s*(\d+)/g,
+        /"event_id"\s*:\s*(\d+).*?"sub_event_id"\s*:\s*(\d+)/g,
+        /window\.__INITIAL_STATE__.*?eventId.*?(\d+).*?subEventId.*?(\d+)/g
       ];
       
       for (const pattern of apiPatterns) {
