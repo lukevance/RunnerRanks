@@ -120,6 +120,7 @@ export function ImportDemo() {
   const [raceId, setRaceId] = useState("");
   const [eventId, setEventId] = useState("");
   const [raceName, setRaceName] = useState("");
+  const [raceDistance, setRaceDistance] = useState<string>("");
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [availableEvents, setAvailableEvents] = useState<RunSignupEvent[]>([]);
@@ -195,7 +196,9 @@ export function ImportDemo() {
         
         body = {
           url: importUrl,
-          sourceProvider: selectedProvider
+          sourceProvider: selectedProvider,
+          raceName: raceName.trim() || undefined,
+          raceDistance: raceDistance || undefined
         };
       } else if (importType === "api") {
         if (!raceId.trim()) {
@@ -417,19 +420,64 @@ export function ImportDemo() {
               />
             </div>
             
-            {/* Provider-specific guidance */}
-            {provider === "raceroster" && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start space-x-2">
-                  <CheckCircle className="w-5 h-5 text-blue-600 mt-0.5" />
-                  <div className="text-sm text-blue-800">
-                    <p className="font-medium mb-1">RaceRoster URL Support</p>
-                    <p className="mb-2">Two URL formats are supported:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-4">
-                      <li><strong>API URLs:</strong> https://results.raceroster.com/v2/api/result-events/84556/sub-events/222034/results</li>
-                      <li><strong>HTML URLs:</strong> https://results.raceroster.com/v2/en-US/results/kcr4axw63nrc9dhn/results</li>
-                    </ul>
-                    <p className="mt-2">HTML URLs will be automatically parsed to extract the underlying API endpoints.</p>
+            {/* RaceRoster-specific fields */}
+            {(provider === "raceroster" || (provider === "auto" && importUrl.toLowerCase().includes('raceroster.com'))) && (
+              <div className="space-y-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+                    <div className="text-sm text-amber-800">
+                      <p className="font-medium mb-1">RaceRoster Manual Confirmation Required</p>
+                      <p>RaceRoster API metadata can be inaccurate. Please manually confirm the race name and distance below.</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Race Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={raceName}
+                    onChange={(e) => setRaceName(e.target.value)}
+                    placeholder="Boston Marathon 2024"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-performance-blue focus:border-performance-blue"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Race Distance <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={raceDistance}
+                    onChange={(e) => setRaceDistance(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-performance-blue focus:border-performance-blue"
+                  >
+                    <option value="">Select race distance...</option>
+                    <option value="marathon">Marathon (26.2 miles)</option>
+                    <option value="half-marathon">Half Marathon (13.1 miles)</option>
+                    <option value="15k">15K (9.3 miles)</option>
+                    <option value="10k">10K (6.2 miles)</option>
+                    <option value="10-mile">10 Mile</option>
+                    <option value="5k">5K (3.1 miles)</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-2">
+                    <CheckCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+                    <div className="text-sm text-blue-800">
+                      <p className="font-medium mb-1">RaceRoster URL Support</p>
+                      <p className="mb-2">Two URL formats are supported:</p>
+                      <ul className="list-disc list-inside space-y-1 ml-4">
+                        <li><strong>API URLs:</strong> https://results.raceroster.com/v2/api/result-events/84556/sub-events/222034/results</li>
+                        <li><strong>HTML URLs:</strong> https://results.raceroster.com/v2/en-US/results/kcr4axw63nrc9dhn/results</li>
+                      </ul>
+                      <p className="mt-2">HTML URLs will be automatically parsed to extract the underlying API endpoints.</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -599,7 +647,8 @@ Jennifer Wang,26,F,San Francisco,CA,2:48:15,6,3`)}
             disabled={importing || importMutation.isPending || (
               importType === "url" && !importUrl.trim() ||
               importType === "csv" && !csvData.trim() ||
-              importType === "api" && (!raceId.trim() || !eventId.trim())
+              importType === "api" && (!raceId.trim() || !eventId.trim()) ||
+              (importType === "url" && (provider === "raceroster" || (provider === "auto" && importUrl.toLowerCase().includes('raceroster.com'))) && (!raceName.trim() || !raceDistance.trim()))
             )}
             className="bg-performance-blue text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
