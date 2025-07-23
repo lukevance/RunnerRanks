@@ -34,9 +34,7 @@ export function RaceManager() {
 
   const deleteMutation = useMutation({
     mutationFn: async (raceId: number) => {
-      return await apiRequest(`/api/races/${raceId}`, {
-        method: 'DELETE'
-      });
+      return await apiRequest('DELETE', `/api/races/${raceId}`);
     },
     onSuccess: (data, raceId) => {
       queryClient.invalidateQueries({ queryKey: ['/api/races'] });
